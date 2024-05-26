@@ -27,7 +27,7 @@ GRAPHICS := fonts
 ARCH	:= 	-mthumb -mthumb-interwork -march=armv5te -mtune=arm946e-s
 
 CFLAGS  :=	-g -Wall -Os \
-            $(ARCH) $(INCLUDE) -DARM9 -D_NO_BOOTSTUB_
+            $(ARCH) $(INCLUDE) -DARM9
 CXXFLAGS := $(CFLAGS) -fno-rtti -fno-exceptions
 ASFLAGS  := -g $(ARCH)
 LDFLAGS   = -specs=ds_arm9.specs -g $(ARCH) -Wl,-Map,$(notdir $*.map)
@@ -35,7 +35,7 @@ LDFLAGS   = -specs=ds_arm9.specs -g $(ARCH) -Wl,-Map,$(notdir $*.map)
 #---------------------------------------------------------------------------------
 # any extra libraries we wish to link with the project
 #---------------------------------------------------------------------------------
-LIBS := -lnds9
+LIBS := -lfat -lnds9
 
 #---------------------------------------------------------------------------------
 # list of directories containing libraries, this must be the top level containing

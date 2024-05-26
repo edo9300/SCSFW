@@ -52,9 +52,12 @@ int main() {
 	irqSet(IRQ_VCOUNT, VcountHandler);
 	irqSet(IRQ_VBLANK, VblankHandler);
 
-	irqEnable(IRQ_VBLANK | IRQ_VCOUNT | IRQ_NETWORK);
+	irqEnable(IRQ_VBLANK | IRQ_VCOUNT);
 
 	setPowerButtonCB(powerButtonCB);
+	
+	if (REG_SNDEXTCNT != 0)fifoSendValue32(FIFO_USER_01, 1);
+	fifoSendValue32(FIFO_USER_02, 1);
 
 	// Keep the ARM7 mostly idle
 	while (!exitflag) {

@@ -1,7 +1,9 @@
 #include <nds.h>
+#include <nds/fifocommon.h>
+#include <nds/fifomessages.h>
 #include <fat.h>
-
 #include <stdio.h>
+#include <nds/arm9/console.h>
 
 #include "font.h"
 #include "tonccpy.h"
@@ -33,6 +35,9 @@ static u8* scfw_buffer;
 static PrintConsole tpConsole;
 static PrintConsole btConsole;
 
+extern PrintConsole* currentConsole;
+
+
 static int bg;
 static int bgSub;
 
@@ -40,19 +45,13 @@ const char* textBuffer = "X------------------------------X\nX-------------------
 
 volatile u32 cachedFlashID;
 volatile u32 statData = 0x00000000;
+volatile u32 firmSize = 0x80000;
 volatile bool UpdateProgressText = false;
 volatile bool PrintWithStat = true;
 volatile bool ClearOnUpdate = true;
 volatile bool SCLiteMode = false;
+volatile bool FileSuccess = false;
 
-void vblankHandler (void) {
-	if (UpdateProgressText) {
-		if (!ClearOnUpdate) { ClearOnUpdate = true; } else { consoleClear(); }
-		printf(textBuffer);
-		if (!PrintWithStat) { PrintWithStat = true; } else { iprintf("%lx \n", statData); }
-		UpdateProgressText = false;
-	}
-}
 
 void Block_Erase(u32 blockAdd) {
 	vu16 v1,v2;  
@@ -275,6 +274,54 @@ void sc_flash_program(vu16 *addr, u16 val) {
 	REG_IME = buf;
 }
 
+bool DoFlash() {
+	sc_flash_rw_enable();
+	printf("\n      Death 2 supercard :3\n");
+	printf("      Erasing whole chip\n");
+	sc_flash_erase_chip();
+	printf("      Erased whole chip\n");
+	for (int i = 0; i < 60; i++)swiWaitForVBlank();
+	for (u32 off = 0; off < firmSize; off += 2) {
+		u16 val = 0;
+		val |= scfw_buffer[off];
+		val |= (scfw_buffer[off+1] << 8);
+		sc_flash_program((vu16*)(0x08000000 + off), val);
+		if (!UpdateProgressText && !(off & 0x00ff)) {
+			textBuffer = "\n\n\n\n\n\n\n\n\n\n\n      Programmed ";
+			statData = (0x08000000 + off);
+			UpdateProgressText = true;
+		}
+	}
+	while(UpdateProgressText)swiWaitForVBlank();
+	printf("\n\n\n\n\n      Ded!\n");
+	return false;
+}
+
+bool DoFlash_Lite() {
+	sc_flash_rw_enable_lite();
+	for(u32 offset = 0; offset < 0x80000; offset += 0x40000) {
+		if (!UpdateProgressText) {
+			textBuffer = "\n    Death 2 supercard lite :3\n\n\n      Erasing whole chip\n\n\n        Erased ";
+			statData = (0x08000000 + offset);
+			UpdateProgressText = true;
+		}
+		Block_Erase(offset);
+	}
+	printf("\n\n\n      Erased whole chip\n");
+	
+	for (int i = 0; i < 60; i++)swiWaitForVBlank();
+		
+	WriteNorFlash_SCLite(0, scfw_buffer, 0x80000);
+	
+	while(UpdateProgressText)swiWaitForVBlank();
+	
+	for (int i = 0; i < 60; i++)swiWaitForVBlank();
+	
+	printf("\n\n\n\n\n      Ded!\n");
+	
+	return true;
+}
+
 
 void CustomConsoleInit() {
 	videoSetMode(MODE_0_2D);
@@ -328,69 +375,91 @@ bool Prompt() {
 	}
 }
 
-bool DoFlash() {
-	sc_flash_rw_enable();
-	printf("\n      Death 2 supercard :3\n");
-	printf("      Erasing whole chip\n");
-	sc_flash_erase_chip();
-	printf("      Erased whole chip\n");
-	for (int i = 0; i < 60; i++)swiWaitForVBlank();
-	for (u32 off = 0; off < (u32)(scfw_binEnd - scfw_bin); off += 2) {
-		u16 val = 0;
-		val |= scfw_bin[off];
-		val |= (scfw_bin[off+1] << 8);
-		sc_flash_program((vu16*)(0x08000000 + off), val);
-		if (!UpdateProgressText && !(off & 0x00ff)) {
-			textBuffer = "\n\n\n\n\n\n\n\n\n\n\n      Programmed ";
-			statData = (0x08000000 + off);
-			UpdateProgressText = true;
-		}
-	}
-	while(UpdateProgressText)swiWaitForVBlank();
-	printf("\n\n\n\n\n      Ded!\n");
-	return false;
-}
 
-bool DoFlash_Lite() {
-	sc_flash_rw_enable_lite();
-	for(u32 offset = 0; offset < 0x80000; offset += 0x40000) {
-		if (!UpdateProgressText) {
-			textBuffer = "\n    Death 2 supercard lite :3\n\n\n      Erasing whole chip\n\n\n        Erased ";
-			statData = (0x08000000 + offset);
-			UpdateProgressText = true;
+void vBlankHandler (void) {
+	if (UpdateProgressText) {
+		if (!ClearOnUpdate) { ClearOnUpdate = true; } else { consoleClear(); }
+		printf(textBuffer);
+		if (!PrintWithStat) { 
+			PrintWithStat = true; 
+		} else { 
+			if (FileSuccess && (currentConsole != &btConsole)) {
+				iprintf("%lx \n\n\n\n\n\n\n\n\n     [FOUND FIRMWARE.FRM]", statData); 
+			} else {
+				iprintf("%lx \n", statData); 
+			}
 		}
-		Block_Erase(offset);
+		UpdateProgressText = false;
 	}
-	printf("\n\n\n      Erased whole chip\n");
-	
-	for (int i = 0; i < 60; i++)swiWaitForVBlank();
-		
-	WriteNorFlash_SCLite(0, scfw_buffer, 0x80000);
-	
-	while(UpdateProgressText)swiWaitForVBlank();
-	
-	for (int i = 0; i < 60; i++)swiWaitForVBlank();
-	
-	printf("\n\n\n\n\n      Ded!\n");
-	
-	return true;
 }
 
 int main(void) {
+	defaultExceptionHandler();
 	CustomConsoleInit();
-	irqSet(IRQ_VBLANK, vblankHandler);
+	irqSet(IRQ_VBLANK, vBlankHandler);
 	sysSetCartOwner(true);
+	fifoWaitValue32(FIFO_USER_02);
+	if (isDSiMode() || fifoCheckValue32(FIFO_USER_01)) {
+		textBuffer = "\n\n\n\n\n\n\n\n\n\n   Trying to kill on DSi/3DS?\n\n       Have you gone mad?";
+		PrintWithStat = false;
+		UpdateProgressText = true;
+		while(UpdateProgressText)swiWaitForVBlank();
+		consoleSelect(&btConsole);
+		printf("\n Press [A] or [B] to exit.\n");
+		while(1) {
+			swiWaitForVBlank();
+			scanKeys();
+			switch (keysDown()) {
+				case KEY_A: return 0;
+				case KEY_B: return 0;
+			}
+		}
+		return 0;
+	}
 	cachedFlashID = sc_flash_id();
 	textBuffer = "\n\n\n\n\n\n\n\n\n\n\n        Flash ID ";
 	statData = cachedFlashID;
 	UpdateProgressText = true;
 	while(UpdateProgressText)swiWaitForVBlank();
 	statData = 0;
-	consoleSelect(&btConsole);
-	
+			
 	scfw_buffer = (u8*)malloc(0x80000);
-	toncset(scfw_buffer, 0xFF, 0x80000);
-	tonccpy(scfw_buffer, scfw_bin, (scfw_binEnd - scfw_bin));
+	
+	if (fatInitDefault()) {
+		FILE *src = NULL;
+		if (access("/firmware.frm", F_OK) == 0) {
+			src = fopen("/firmware.frm", "rb");
+		} else if (access("/scfw/firmware.frm", F_OK) == 0) {
+			src = fopen("/scfw/firmware.frm", "rb");
+		}
+		if (src) {
+			fseek(src, 0, SEEK_END);
+			firmSize = ftell(src);
+			fseek(src, 0, SEEK_SET);
+			if (firmSize <= 0x80000) {
+				printf("\n\n\n\n\n\n\n\n     [FOUND FIRMWARE.FRM]");
+				consoleSelect(&btConsole);
+				printf("\n Reading FIRMWARE.FRM\n\n Please Wait...");
+				fread((u8*)scfw_buffer, 1, firmSize, src);
+				FileSuccess = true;
+				fclose(src);
+				consoleClear();
+			} else {
+				FileSuccess = false;
+			}
+		} else {
+			FileSuccess = false;
+		}
+	} else {
+		FileSuccess = false;
+	}
+	
+	if (!FileSuccess) {
+		consoleSelect(&btConsole);
+		toncset(scfw_buffer, 0xFF, 0x80000);
+		tonccpy(scfw_buffer, scfw_bin, (scfw_binEnd - scfw_bin));
+		firmSize = (scfw_binEnd - scfw_bin);
+	}
 	
 	printf("\n Press [A] to kill supercard.\n");
 	printf(" Press [B] to spare supercard.\n");
