@@ -92,6 +92,7 @@ struct settings {
 	int smsa_bios;
 	int wsv_bios;
 	int ngp_bios;
+	int bwsc_bios;
 };
 struct settings settings = {
 	.autosave = 1,
@@ -104,7 +105,18 @@ struct settings settings = {
 	.cold_boot_save = 1,
 	.smsa_bios = 0,
 	.wsv_bios = 0,
-	.ngp_bios = 0
+	.ngp_bios = 0,
+	.bwsc_bios = 0
+};
+
+struct bwsc_h{
+	u32 id; //BWS",0x1A
+	u32 filesize;
+	u32 flags;			// Bit 1 = PCV2, Bit 2 = WSC, Bit 3 = SwanCrystal.
+	u32 follow;
+	u32 bios;				// Bit 0 = Bios,
+	u32 res0, res1, res2;
+	char name[32];
 };
 
 struct hvca_h{
@@ -194,11 +206,15 @@ bool filter_game(struct dirent *dirent) {
 		return true;
 	if (namelen > 4 && !strcasecmp(dirent->d_name + namelen - 4, ".sms"))
 		return true;
+	if (namelen > 4 && (!strcasecmp(dirent->d_name + namelen - 4, ".wsc") || !strcasecmp(dirent->d_name + namelen - 4, ".pc2")))
+		return true;
 	if (namelen > 3 && !strcasecmp(dirent->d_name + namelen - 3, ".gb"))
 		return true;
 	if (namelen > 3 && (!strcasecmp(dirent->d_name + namelen - 3, ".gg") || !strcasecmp(dirent->d_name + namelen - 3, ".sg")))
 		return true;
 	if (namelen > 3 && !strcasecmp(dirent->d_name + namelen - 3, ".sv"))
+		return true;
+	if (namelen > 3 && !strcasecmp(dirent->d_name + namelen - 3, ".ws"))
 		return true;
 	return false;
 }
@@ -222,11 +238,15 @@ bool filter_selectable(struct dirent *dirent) {
 		return true;
 	if (namelen > 4 && !strcasecmp(dirent->d_name + namelen - 4, ".sms"))
 		return true;
+	if (namelen > 4 && (!strcasecmp(dirent->d_name + namelen - 4, ".wsc") || !strcasecmp(dirent->d_name + namelen - 4, ".pc2")))
+		return true;
 	if (namelen > 3 && !strcasecmp(dirent->d_name + namelen - 3, ".gb"))
 		return true;
 	if (namelen > 3 && (!strcasecmp(dirent->d_name + namelen - 3, ".gg") || !strcasecmp(dirent->d_name + namelen - 3, ".sg")))
 		return true;
 	if (namelen > 3 && !strcasecmp(dirent->d_name + namelen - 3, ".sv"))
+		return true;
+	if (namelen > 3 && !strcasecmp(dirent->d_name + namelen - 3, ".ws"))
 		return true;
 	if (namelen > 4 && !strcasecmp(dirent->d_name + namelen - 4, ".frm"))
 		return true;
@@ -454,6 +474,47 @@ char *basename(char *path)
 {
     char *base = strrchr(path, '/');
     return base ? base+1 : path;
+}
+
+void bwsc_f(char path[], struct bwsc_h *head, const char *out) {
+	head->id = 0x1A534D53; // BWS for BIOS
+	
+    FILE *i_file = fopen(path, "rb");
+    FILE *o_file = fopen(out, "wb");
+	
+	if(!i_file) {
+		fclose(i_file);
+		fclose(o_file);
+		iprintf("\nUnable to find: \n %s \n\n", path);
+		u_prompt("ERROR: MISSING DEPENDENCY\n\nPress A to acknowledge");
+		tryAgain();
+	} else {
+        fseek(i_file, 0, SEEK_END);
+        head->filesize = ftell(i_file);
+        rewind(i_file);
+		head->flags = 0;
+		iprintf("Analyzing...\n");
+		head->follow = 0;
+		head->bios = 0;
+		if (strcasestr(basename(path), "[BIOS]")) {
+			head->bios |= (1 << 0);
+			iprintf("BIOS detected\n");
+		}
+		else
+		{
+			head->bios |= (0 << 0);
+		}
+		head->res0 = 0;
+		head->res1 = 0;
+		head->res2 = 0;
+		char bname_b[32];
+		strncpy(bname_b, basename(path), sizeof(bname_b) - 1);
+		bname_b[sizeof(bname_b) - 1] = '\0'; 
+		strcpy(head->name, bname_b);
+		fwrite(head, 1, sizeof(*head), o_file);
+		fclose(i_file);
+		fclose(o_file);
+	}
 }
 
 void FlashROM(char *path, u32 pathlen, FILE *rom, u32 romsize, bool F_EOL){
@@ -784,6 +845,98 @@ void selectFile(char *path) {
 			else if (pressed & KEY_R) {
 				saveSram(path);
 			}
+		}
+	} else if ((pathlen > 4 && !strcasecmp(path + pathlen - 4, ".pc2")) || (pathlen > 4 && !strcasecmp(path + pathlen - 4, ".wsc")) || (pathlen > 3 && !strcasecmp(path + pathlen - 3, ".ws"))){
+		u32 romsize = 0;
+		total_bytes = 0,bytes = 0;
+		const char *emu_bin = "/scfw/bwsc.gba";
+		FILE *emu = fopen(emu_bin, "rb");
+		if (!emu) {
+			iprintf("Checking %s\n",emu_bin);
+			u_prompt("No SwanGBA found!\n\n");
+			fclose(emu);
+		} else {
+			fseek(emu,0,SEEK_END);
+			romsize = ftell(emu);
+			romSize = romsize;
+			fseek(emu, 0, SEEK_SET);
+			iprintf("Loading SwanGBA\n\n");
+			FlashROM(path,pathlen,emu,romSize,false);
+			struct bwsc_h head;
+			//
+			FILE *out_f0, *out_f1;
+			if (settings.bwsc_bios) {
+				char bwsc_deps[64];
+				const char *output_path;
+				if (!strcasecmp(path + pathlen - 4, ".wsc"))
+					strcpy(bwsc_deps,"/scfw/[BIOS]bws_color.wsc");
+				if (!strcasecmp(path + pathlen - 4, ".pc2"))
+					strcpy(bwsc_deps,"/scfw/[BIOS]bws_pc2.wsc");
+				if (!strcasecmp(path + pathlen - 3, ".ws"))
+					strcpy(bwsc_deps,"/scfw/[BIOS]bws_og.wsc");
+				output_path = "/scfw/bwsc_0.dat";
+				iprintf("... PLEASE WAIT ...\n\n");
+				bwsc_f(bwsc_deps, &head, output_path);
+				out_f0 = fopen(output_path, "rb");
+				fseek(out_f0,0,SEEK_END);
+				romsize = ftell(out_f0);
+				romSize += romsize;
+				fseek(out_f0, 0, SEEK_SET);
+				FlashROM(path,pathlen,out_f0,romSize,false);
+				out_f1 = fopen(bwsc_deps, "rb");
+				fseek(out_f1, 0, SEEK_END);
+				romsize = ftell(out_f1);
+				romSize += romsize;
+				fseek(out_f1, 0, SEEK_SET);
+				iprintf("Loading SwanGBA BIOS:\n\n");
+				FlashROM(path,pathlen,out_f1,romSize,false);
+			}
+			//BIOS FIRST THEN USER CFG ~ BIOS loading not supported atm
+			//
+			head.id = 0x1A534D53; //SMS for games
+			FILE *rom = fopen(path, "rb");
+			fseek(rom, 0, SEEK_END);
+			romsize = ftell(rom);
+			head.filesize = 0;
+			head.filesize = romsize;
+			head.flags = 0;
+			if(!strcasecmp(path + pathlen - 4, ".wsc"))
+				head.flags |= (1 << 2);
+			if(!strcasecmp(path + pathlen - 4, ".pc2"))
+				head.flags |= (1 << 1);
+			else
+				head.flags |= (1 << 3);
+			iprintf("Analyzing ROM...\n\n");
+			head.follow = 0;
+			head.bios = 0;
+			head.res0 = 0;
+			head.res1 = 0;
+			head.res2 = 0;
+			char bname_b[32];
+			strncpy(bname_b, basename(path), sizeof(bname_b) - 1);
+			bname_b[sizeof(bname_b) - 1] = '\0'; 
+			strcpy(head.name, bname_b);
+			FILE *out_h = fopen("/scfw/bwsc_1.dat", "wb");
+			fwrite(&head,1, sizeof head, out_h);
+			fclose(out_h);
+			out_h = fopen("/scfw/bwsc_1.dat", "rb");
+			fseek(out_h,0,SEEK_END);
+			romsize = ftell(out_h);
+			romSize += romsize;
+			fseek(out_h, 0, SEEK_SET);
+			FlashROM(path,pathlen,out_h,romSize,false);
+			fseek(rom, 0, SEEK_END);
+			romsize = ftell(rom);
+			romSize += romsize;
+			fseek(rom, 0, SEEK_SET);
+			iprintf("Loading ROM:\n\n");
+			FlashROM(path,pathlen,rom,romSize,true);
+			fclose(rom);
+			fclose(out_h);
+			fclose(out_f1);
+			fclose(out_f0);
+			fclose(emu);
+			L_Seq(path);
 		}
 	} else if ((pathlen > 4 && !strcasecmp(path + pathlen - 4, ".fds")) || (pathlen > 4 && !strcasecmp(path + pathlen - 4, ".nsf"))){
 		u32 romsize = 0;
@@ -1357,7 +1510,7 @@ void selectFile(char *path) {
 void change_settings(char *path) {
 	for (int cursor = 0;;) {
 		iprintf("\x1b[2J"
-		        "SCFW Kernel v0.5.2-HVCA-B \nGBA-mode\n\n");
+		        "SCFW Kernel v0.5.2-WSwan \nGBA-mode\n\n");
 		
 		iprintf("%cAutosave: %i\n", cursor == 0 ? '>' : ' ', settings.autosave);
 		iprintf("%cSRAM Patch: %i\n", cursor == 1 ? '>' : ' ', settings.sram_patch);
@@ -1368,6 +1521,7 @@ void change_settings(char *path) {
 		iprintf("%c[SMSAdvance] Load BIOS: %i\n", cursor == 6 ? '>' : ' ', settings.smsa_bios);
 		iprintf("%c[WasabiGBA] Load BIOS: %i\n", cursor == 7 ? '>' : ' ', settings.wsv_bios);
 		iprintf("%c[NGPGBA] Load BIOS: %i\n", cursor == 8 ? '>' : ' ', settings.ngp_bios);
+		iprintf("%c[SwanGBA] Load BIOS: %i\n", cursor == 9 ? '>' : ' ', settings.bwsc_bios);
 		
 		do {
 			scanKeys();
@@ -1404,6 +1558,9 @@ void change_settings(char *path) {
 			case 8:
 				settings.ngp_bios = !settings.ngp_bios;
 				break;
+			case 9:
+				settings.bwsc_bios = !settings.bwsc_bios;
+				break;
 			}
 		}
 		if (pressed & KEY_B) {
@@ -1412,12 +1569,12 @@ void change_settings(char *path) {
 		if (pressed & KEY_UP) {
 			--cursor;
 			if (cursor < 0)
-				cursor += 9;
+				cursor += 10;
 		}
 		if (pressed & KEY_DOWN) {
 			++cursor;
-			if (cursor > 8)
-				cursor -= 9;
+			if (cursor > 9)
+				cursor -= 10;
 		}
 	}
 	
@@ -1445,7 +1602,7 @@ int main() {
 
 	consoleDemoInit();
 
-	iprintf("SCFW Kernel v0.5.2-HVCA-B \nGBA-mode\n\n");
+	iprintf("SCFW Kernel v0.5.2-WSwan \nGBA-mode\n\n");
 	
 	*(vu16*) 0x04000204	 = 0x40c0;
 	if (overclock_ewram())
