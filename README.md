@@ -34,17 +34,21 @@ For Home Video Computer Advance, builds require additional work - but after doin
     * The base.bin file of hvca requires gbafix and an addiontal step:
         * _"Like retail games, this emulator tries to increase the ROM speed which supercard is not compatible with, I just disabled that"_ - Metroid Maniac
 
+For SwanGBA, you need to download OR build your preferred SwanGBA fork/binary along with the needed dependencies and rename it to:
+- bwsc.gba
+
 Once you have those files, transfer these to the scfw folder.
 You should find the ff. within the scfw folder:
+- bwsc.gba
 - gb.gba
 - gbc.gba
+- hvca.gba (Custom built version by metroid-maniac)
 - kernel.gba
 - nes.gba
 - ngp.gba
 - pcea.gba
 - smsa.gba
 - wsv.gba
-- hvca.gba (Custom built version by metroid-maniac)
 - ./hvca/ (folder)
 - ./hvca/mapr/ (folder)
 
@@ -72,16 +76,44 @@ You should find the ff. within the scfw folder:
 - HVCA support ✅
     - Loads Famicom Disk System games (*.fds)
 	- Plays Nintendo Sound Files (*.nsf)
+- SwanGBA support ✅
+    - Loads Benesse Pocket Challenge V2 games (*.pc2)
+	- Loads WonderSwan games (*.ws)
+	- Loads WonderSwan Color games (*.wsc)
 	 
-## Observations
+## Emu loading observation
 - ✅ Stable on:
     - GBA
     - NDS / NDSL Game Boy mode
 - ❌ Unstable on:
     - EXEQ Game Box (clone console)
 	
+## Observed emulator quirks
+System | Emulator | Quit to firmware | Soft reset | Modular
+:-:|:-:|:-:|:-:|:-:
+Game Boy | Goomba / Super Goomba / Goomba Color | ✔ | ✔ | ✔
+Game Boy Color | Jagoomba Color / Goomba Color | ✔ | ✔ | ✔
+Nintendo Entertainment System / Family Computer | PocketNES | ⚠ | ✔ | ✔
+Sega Master System | SMSAdvance | ❌ | ✔ | ✔
+Sega Game Gear | SMSAdvance | ❌ | ✔ | ✔
+Sega Game 1000 / Sega 1000 | SMSAdvance | ❌ | ✔ | ✔
+NEC PC-Engine / TurboGrafx-16 | PCEAdvance | ❌ | ❌ | ✔
+Watara/Quickshot Supervision | WasabiGBA | ⚠ | ✔ | ✔
+Neo Geo Pocket / Color | NGPGBA | ⚠ | ✔ | ✔
+Famicom Disk System / NSF Player | HVCA | ❌ | ❌ | ‼
+Bandai WonderSwan/WonderSwan Color / Benesse Pocket Challenge V2 | SwanGBA | ❌ | ✔ | ✔
+> **_LEGEND:_**
+> > * ‼ ~ Requires some technical know-how to get working / Modular to an extent, but requires additional work.
+> > * ⚠ ~ Varies per fork / version OR works with some caveats(buggy). Use with caution
+> > * ❌ ~ Unsupported / Not functioning as intended
+> > * ✔ ~ Supported / Works as intended
+>
+> **_NOTE:_**  Emulator binaries can be improved upon and can be made compatible with the kernel just like Goomba.
+> * IF QUIT TO FIRMWARE DOESN'T WORK, USE THE SOFT RESET METHOD TO QUIT TO FIRMWARE.
+>     * Soft reset key combination: **START** + **SELECT** + **A** + **B**
+	
 ##NOTES
-- ⚠Some GBAOAC devices such as the EXEQ Game Box SP don't play nice with flash carts as it doesn't have the same wait time. Thus, ROMs boot faster and the flash cart does not have enough time to prepare. Try to toggle "Boot games through BIOS" each time you exit a GBC/GB game.
+- ⚠Some GBAOAC devices such as the EXEQ Game Box SP don't play nice with flash carts as it doesn't have the same wait time. Thus, ROMs boot faster and the flash cart does not have enough time to prepare. Try to toggle "Boot games through BIOS" each time you exit an emu ROM or game.
     - Alternative method for GBAOC devices: Create a ROM compilation and sideload the resulting gba file. This process is tedious, but it works best for clones like these.
 - ⚠WARNING: The cart **appears** to not have enough time to properly load both emulator and ROM if you skip the BIOS. It's better to leave that kernel option "Boot games through BIOS" as 1 (on).
 
