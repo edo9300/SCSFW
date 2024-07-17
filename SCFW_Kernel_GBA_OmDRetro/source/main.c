@@ -93,6 +93,7 @@ struct settings {
 	int wsv_bios;
 	int ngp_bios;
 	int bwsc_bios;
+	int DrSMS_prio;
 };
 struct settings settings = {
 	.autosave = 1,
@@ -106,7 +107,8 @@ struct settings settings = {
 	.smsa_bios = 0,
 	.wsv_bios = 0,
 	.ngp_bios = 0,
-	.bwsc_bios = 0
+	.bwsc_bios = 0,
+	.DrSMS_prio = 0
 };
 
 struct bwsc_h{
@@ -151,6 +153,14 @@ struct pnes_h {
 	u32 flags;
 	u32 follow;
 	u32 reserved;
+};
+
+struct drsms_h {
+	u8 id; //ROM #. ROM 0 is the emulator itself so ROMs actually start at 1
+	char pad0[5]; //pad 5 bytes of data
+	u8 flags; //Indicate if USA/JAP ROM(bit 2) or EUR ROM(bit 3) or Game Gear Japan ROM (bit 1)
+	char pad1[5]; //pad 5 bytes for SMS. If Game Gear ROM, assign pad1[1]= 0x01 ~ means game gear mode
+	char name[28];
 };
 
 struct smsa_h {
@@ -846,7 +856,7 @@ void selectFile(char *path) {
 				saveSram(path);
 			}
 		}
-	} else if ((pathlen > 4 && !strcasecmp(path + pathlen - 4, ".pc2")) || (pathlen > 4 && !strcasecmp(path + pathlen - 4, ".wsc")) || (pathlen > 3 && !strcasecmp(path + pathlen - 3, ".ws"))){
+	} else if ((pathlen > 4 && (!strcasecmp(path + pathlen - 4, ".pc2") || !strcasecmp(path + pathlen - 4, ".wsc"))) || (pathlen > 3 && !strcasecmp(path + pathlen - 3, ".ws"))){
 		u32 romsize = 0;
 		total_bytes = 0,bytes = 0;
 		const char *emu_bin = "/scfw/bwsc.gba";
@@ -938,7 +948,7 @@ void selectFile(char *path) {
 			fclose(emu);
 			L_Seq(path);
 		}
-	} else if ((pathlen > 4 && !strcasecmp(path + pathlen - 4, ".fds")) || (pathlen > 4 && !strcasecmp(path + pathlen - 4, ".nsf"))){
+	} else if (pathlen > 4 && (!strcasecmp(path + pathlen - 4, ".fds") || !strcasecmp(path + pathlen - 4, ".nsf"))){
 		u32 romsize = 0;
 		total_bytes = 0,bytes = 0;
 		const char *emu_bin = "/scfw/hvca.gba";
@@ -1235,7 +1245,7 @@ void selectFile(char *path) {
 			fclose(emu);
 			L_Seq(path);
 		}
-	} else if ((pathlen > 4 && !strcasecmp(path + pathlen - 4, ".sms")) || (pathlen > 3 && !strcasecmp(path + pathlen - 3, ".gg")) || (pathlen > 3 && !strcasecmp(path + pathlen - 3, ".sg"))){
+	} else if ((!settings.DrSMS_prio && ((pathlen > 4 && !strcasecmp(path + pathlen - 4, ".sms")) || (pathlen > 3 && !strcasecmp(path + pathlen - 3, ".gg")))) || (pathlen > 3 && !strcasecmp(path + pathlen - 3, ".sg"))){
 		u32 romsize = 0;
 		total_bytes = 0,bytes = 0;
 		const char *emu_bin = "/scfw/smsa.gba";
@@ -1338,6 +1348,89 @@ void selectFile(char *path) {
 			fclose(emu);
 			L_Seq(path);
 		}
+	} else if (settings.DrSMS_prio && ((pathlen > 4 && !strcasecmp(path + pathlen - 4, ".sms")) || (pathlen > 3 && !strcasecmp(path + pathlen - 3, ".gg")))){
+		u32 romsize = 0;
+		total_bytes = 0,bytes = 0;
+		const char *emu_bin = "/scfw/drsms.gba";
+		FILE *emu = fopen(emu_bin, "rb");
+		if (!emu) {
+			iprintf("Checking %s\n",emu_bin);
+			u_prompt("No DrSMS found!\n\n");
+			fclose(emu);
+		} else {
+			fseek(emu,0,SEEK_END);
+			romsize = ftell(emu);
+			romSize = romsize;
+			fseek(emu, 0, SEEK_SET);
+			iprintf("Loading DrSMS\n\n");
+			FlashROM(path,pathlen,emu,romSize,false);
+			struct drsms_h head;
+			const char *output_path;
+			head.id = 1;
+			FILE *rom = fopen(path, "rb");
+			fseek(rom, 0, SEEK_END);
+			romsize = ftell(rom);
+			head.pad0[0] = 0;
+			head.flags = 0;
+			iprintf("Analyzing ROM...\n\n");
+			if(!strcasecmp(path + pathlen - 4, ".sms"))
+			{
+				if (strcasestr(basename(path), "(E)") || strcasestr(basename(path), "(EUR)") || strcasestr(basename(path), "(Europe)") || strcasestr(basename(path), "(Brazil)") || strcasestr(basename(path), "(BRA)")) {
+					head.flags |= (1 << 3);
+					iprintf("SMS EUROPE/BRAZIL ROM\n\n");
+				} else if (strcasestr(basename(path), "(USA, Europe)") || strcasestr(basename(path), "(UE)")) {
+					head.flags |= (1 << 1);
+					iprintf("SMS NTSC + PAL ROM\n\n");
+				} else if (strcasestr(basename(path), "(Korea)") || strcasestr(basename(path), "(KOR)")) {
+					head.flags |= (1 << 7);
+					iprintf("SMS Korea ROM\n\n");
+				} else {
+					head.flags |= (1 << 2);
+					iprintf("SMS USA/WORLD ROM\n\n");
+				}
+			}
+			if(!strcasecmp(path + pathlen - 3, ".gg"))
+			{
+				if (strcasestr(basename(path), "(J)") || strcasestr(basename(path), "(UE)") || strcasestr(basename(path), "(JAPAN)")) {
+					head.flags |= (1 << 1); //0x02
+					iprintf("GG JAPAN/UE ROM\n\n");
+				} else if (strcasestr(basename(path), "(World)")) {
+					head.flags |= (1 << 2); //0x04
+					iprintf("GG World ROM\n\n");
+				} else {
+					head.flags |= (1 << 3); //0x08
+					iprintf("GG ROM \n\n");
+				}
+				iprintf("Enabling DrSMS GameGear mode\n\n");
+				head.pad1[0] = 0;
+				head.pad1[1] = 0x01;
+			} else {
+				head.pad1[0] = 0;
+			}
+			char bname_b[28];
+			strncpy(bname_b, basename(path), sizeof(bname_b) - 1);
+			bname_b[sizeof(bname_b) - 1] = '\0'; 
+			strcpy(head.name, bname_b);
+			FILE *out_h = fopen("/scfw/drsms_0.dat", "wb");
+			fwrite(&head,1, sizeof head, out_h);
+			fclose(out_h);
+			out_h = fopen("/scfw/drsms_0.dat", "rb");
+			fseek(out_h,0,SEEK_END);
+			romsize = ftell(out_h);
+			romSize += romsize;
+			fseek(out_h, 0, SEEK_SET);
+			FlashROM(path,pathlen,out_h,romSize,false);
+			fseek(rom, 0, SEEK_END);
+			romsize = ftell(rom);
+			romSize += romsize;
+			fseek(rom, 0, SEEK_SET);
+			iprintf("Loading ROM:\n\n");
+			FlashROM(path,pathlen,rom,romSize,true);
+			fclose(rom);
+			fclose(out_h);
+			fclose(emu);
+			L_Seq(path);
+		}
 	} else if (pathlen > 3 && !strcasecmp(path + pathlen - 3, ".sv")){
 		u32 romsize = 0;
 		total_bytes = 0,bytes = 0;
@@ -1415,7 +1508,7 @@ void selectFile(char *path) {
 			fclose(emu);
 			L_Seq(path);
 		}
-	} else if ((pathlen > 4 && !strcasecmp(path + pathlen - 4, ".ngp")) || (pathlen > 4 && !strcasecmp(path + pathlen - 4, ".ngc"))){
+	} else if (pathlen > 4 && (!strcasecmp(path + pathlen - 4, ".ngp") || !strcasecmp(path + pathlen - 4, ".ngc"))){
 		u32 romsize = 0;
 		total_bytes = 0,bytes = 0;
 		const char *emu_bin = "/scfw/ngp.gba";
@@ -1510,7 +1603,7 @@ void selectFile(char *path) {
 void change_settings(char *path) {
 	for (int cursor = 0;;) {
 		iprintf("\x1b[2J"
-		        "SCFW Kernel v0.5.2-WSwan \nGBA-mode\n\n");
+		        "SCFW Kernel v0.5.2-DrSMS \nGBA-mode\n\n");
 		
 		iprintf("%cAutosave: %i\n", cursor == 0 ? '>' : ' ', settings.autosave);
 		iprintf("%cSRAM Patch: %i\n", cursor == 1 ? '>' : ' ', settings.sram_patch);
@@ -1518,10 +1611,11 @@ void change_settings(char *path) {
 		iprintf("%cSoft reset Patch: %i\n", cursor == 3 ? '>' : ' ', settings.soft_reset_patch);
 		iprintf("%cBoot games through BIOS: %i\n", cursor == 4 ? '>' : ' ', settings.biosboot);
 		iprintf("%cAutosave after cold boot: %i\n", cursor == 5 ? '>' : ' ', settings.cold_boot_save);
-		iprintf("%c[SMSAdvance] Load BIOS: %i\n", cursor == 6 ? '>' : ' ', settings.smsa_bios);
-		iprintf("%c[WasabiGBA] Load BIOS: %i\n", cursor == 7 ? '>' : ' ', settings.wsv_bios);
-		iprintf("%c[NGPGBA] Load BIOS: %i\n", cursor == 8 ? '>' : ' ', settings.ngp_bios);
-		iprintf("%c[SwanGBA] Load BIOS: %i\n", cursor == 9 ? '>' : ' ', settings.bwsc_bios);
+		iprintf("%cDrSMS over SMSAdvance: %i\n", cursor == 6 ? '>' : ' ', settings.DrSMS_prio);
+		iprintf("%c[SMSAdvance] Load BIOS: %i\n", cursor == 7 ? '>' : ' ', settings.smsa_bios);
+		iprintf("%c[WasabiGBA] Load BIOS: %i\n", cursor == 8 ? '>' : ' ', settings.wsv_bios);
+		iprintf("%c[NGPGBA] Load BIOS: %i\n", cursor == 9 ? '>' : ' ', settings.ngp_bios);
+		iprintf("%c[SwanGBA] Load BIOS: %i\n", cursor == 10 ? '>' : ' ', settings.bwsc_bios);
 		
 		do {
 			scanKeys();
@@ -1550,15 +1644,18 @@ void change_settings(char *path) {
 				settings.cold_boot_save = !settings.cold_boot_save;
 				break;
 			case 6:
-				settings.smsa_bios = !settings.smsa_bios;
+				settings.DrSMS_prio = !settings.DrSMS_prio;
 				break;
 			case 7:
-				settings.wsv_bios = !settings.wsv_bios;
+				settings.smsa_bios = !settings.smsa_bios;
 				break;
 			case 8:
-				settings.ngp_bios = !settings.ngp_bios;
+				settings.wsv_bios = !settings.wsv_bios;
 				break;
 			case 9:
+				settings.ngp_bios = !settings.ngp_bios;
+				break;
+			case 10:
 				settings.bwsc_bios = !settings.bwsc_bios;
 				break;
 			}
@@ -1569,12 +1666,12 @@ void change_settings(char *path) {
 		if (pressed & KEY_UP) {
 			--cursor;
 			if (cursor < 0)
-				cursor += 10;
+				cursor += 11;
 		}
 		if (pressed & KEY_DOWN) {
 			++cursor;
-			if (cursor > 9)
-				cursor -= 10;
+			if (cursor > 10)
+				cursor -= 11;
 		}
 	}
 	
@@ -1596,13 +1693,12 @@ bool has_reset_token() {
 int main() {
 	irqInit();
 	irqEnable(IRQ_VBLANK);
-
 	scanKeys();
 	keysDownRepeat();
 
 	consoleDemoInit();
 
-	iprintf("SCFW Kernel v0.5.2-WSwan \nGBA-mode\n\n");
+	iprintf("SCFW Kernel v0.5.2-DrSMS \nGBA-mode\n\n");
 	
 	*(vu16*) 0x04000204	 = 0x40c0;
 	if (overclock_ewram())
@@ -1729,6 +1825,11 @@ int main() {
 			else if (pressed & KEY_B) {
 				if (chdir(".."))
 					change_settings(NULL);
+				break;
+			}
+			else if (pressed & KEY_SELECT) {
+				if (chdir(".."))
+					//ShowRTC();
 				break;
 			}
 			else if (pressed & KEY_START) {
