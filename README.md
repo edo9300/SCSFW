@@ -9,36 +9,46 @@ This branch is primarily for those who'd like to test out/play with new revision
 
 ## Prerequisites for emulator use
 For Game Boy / Game Boy Color, you need to download your preferred Goomba fork/binary and rename it to:
-- gbc.gba
+- `gbc.gba`
     - For Game Boy Color emulation
-- gb.gba
+- `gb.gba`
 	- For Game Boy emulation
 
 For NES/Famicom, you need to download your preferred PocketNES fork/binary and rename it to:
-- nes.gba
+- `nes.gba`
 
 For Sega Master System, Game Gear, and Sega Game 1000 (Sega 1000), you need to download your preferred SMSAdvance fork/binary and rename it to:
-- smsa.gba
+- `smsa.gba`
 
 For NEC PC-Engine/TurboGrafx-16, you need to download your preferred PCEAdvance fork/binary and rename it to:
-- pcea.gba
+- `pcea.gba`
 
 For Watara/Quickshot Supervision, you need to download your preferred WasabiGBA fork/binary and rename it to:
-- wsv.gba
+- `wsv.gba`
 
 For Neo Geo Pocket / Color, you need to download your preferred NGPGBA fork/binary and rename it to:
-- ngp.gba
+- `ngp.gba`
 
 For Home Video Computer Advance, builds require additional work - but after doing so you can rename the binary to:
-- hvca.gba
+- `hvca.gba`
     * The base.bin file of hvca requires gbafix and an addiontal step:
         * _"Like retail games, this emulator tries to increase the ROM speed which supercard is not compatible with, I just disabled that"_ - Metroid Maniac
 
 For SwanGBA, you need to download OR build your preferred SwanGBA fork/binary along with the needed dependencies and rename it to:
-- bwsc.gba
+- `bwsc.gba`
 
 For DrSMS, builds require additional work - but after doing so you can rename the binary to:
-- drsms.gba
+- `drsms.gba`
+
+## Other applications
+
+For Music Player Advance 2 by NEiM0D, there's only one known version I found and it's found on [archive.org](https://web.archive.org/web/20181020204131/http://www.cellularmobilephones.com/gba_net/MusicPlayer_Advance_2.zip). Simply rename `MPLAYERA.GBA` to `mpa.gba` and gbafix it before placing it inside the scfw folder.
+
+For Ebook Advance by Daniel Cotter(txt file reader), the latest version is found on [archive.org](https://web.archive.org/web/20070512224717/http://members.optushome.com.au:80/dancotter/ebook.htm). There are two versions here namely:  
+- Ebook Advance - Variable width font **Vertical Version** (ebook03s.zip)
+    - Simply rename `ebook.gba` found in the archive, gbafix it, then rename it to `txt_s.gba` then place it in the scfw folder.
+- Ebook Advance - Variable width font **Horizontal Version** (ebook03.zip)
+    - Simply rename `ebook.gba` found in the archive, gbafix it, then rename it to `txt.gba` then place it in the scfw folder.
 
 Once you have those files, transfer these to the scfw folder.
 You should find the ff. within the scfw folder:
@@ -48,10 +58,13 @@ You should find the ff. within the scfw folder:
 - gbc.gba
 - hvca.gba (Custom built version by metroid-maniac)
 - kernel.gba
+- mpa.gba
 - nes.gba
 - ngp.gba
 - pcea.gba
 - smsa.gba
+- txt_s.gba
+- txt.gba
 - wsv.gba
 - ./hvca/ (folder)
 - ./hvca/mapr/ (folder)
@@ -89,13 +102,21 @@ You should find the ff. within the scfw folder:
     	- Supports FM Audio (Sega Master System Mark III)
     - Loads Sega Master System games (*.sms)
 	- Can use kernel settings to switch between SMSAdvance and DrSMS for SMS/GG ROM loading.
+- E-Book Advance support ✅
+	- Loads TXT files (*.txt)
+- Music Player Advance 2 support ✅
+    - Loads Music Player Advance files (*.mpa)
+	- Loads Music Player Advance Compilation files (*.mpac)
 	 
 ## Emu loading observation
 - ✅ Stable on:
-    - GBA
-    - NDS / NDSL Game Boy mode
-- ❌ Unstable on:
-    - EXEQ Game Box (clone console)
+    - Original hardware:
+        - GBA
+        - NDS / NDSL ~ Game Boy mode
+- ❌ Inconsistent:
+    - Clone consoles:
+        - EXEQ Game Box (clone console)
+	    - DIGI RETROBOY / REVO K101 Plus
 	
 ## Observed emulator quirks
 System | Emulator | Quit to firmware | Soft reset | Modular
