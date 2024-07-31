@@ -94,6 +94,7 @@ struct settings {
 	int ngp_bios;
 	int bwsc_bios;
 	int DrSMS_prio;
+	int txtmode_s;
 };
 struct settings settings = {
 	.autosave = 1,
@@ -108,7 +109,8 @@ struct settings settings = {
 	.wsv_bios = 0,
 	.ngp_bios = 0,
 	.bwsc_bios = 0,
-	.DrSMS_prio = 0
+	.DrSMS_prio = 0,
+	.txtmode_s = 0
 };
 
 struct bwsc_h{
@@ -126,6 +128,13 @@ struct hvca_h{
 	char filename[32]; 
 	char ext[4];
 	long filesize;
+};
+
+struct mpa2_h{
+    u32 TotalH_size;
+    u32 h_size;
+    char songtitle[40];
+    u32 term0,term1;
 };
 
 struct ngp_h{
@@ -224,7 +233,11 @@ bool filter_game(struct dirent *dirent) {
 		return true;
 	if (namelen > 3 && !strcasecmp(dirent->d_name + namelen - 3, ".sv"))
 		return true;
+	if (namelen > 4 && !strcasecmp(dirent->d_name + namelen - 4, ".txt"))
+		return true;
 	if (namelen > 3 && !strcasecmp(dirent->d_name + namelen - 3, ".ws"))
+		return true;
+	if ((namelen > 4 && !strcasecmp(dirent->d_name + namelen - 4, ".mpa")) || (namelen > 5 && !strcasecmp(dirent->d_name + namelen - 5, ".mpac")))
 		return true;
 	return false;
 }
@@ -256,7 +269,11 @@ bool filter_selectable(struct dirent *dirent) {
 		return true;
 	if (namelen > 3 && !strcasecmp(dirent->d_name + namelen - 3, ".sv"))
 		return true;
+	if (namelen > 4 && !strcasecmp(dirent->d_name + namelen - 4, ".txt"))
+		return true;
 	if (namelen > 3 && !strcasecmp(dirent->d_name + namelen - 3, ".ws"))
+		return true;
+	if ((namelen > 4 && !strcasecmp(dirent->d_name + namelen - 4, ".mpa")) || (namelen > 5 && !strcasecmp(dirent->d_name + namelen - 5, ".mpac")))
 		return true;
 	if (namelen > 4 && !strcasecmp(dirent->d_name + namelen - 4, ".frm"))
 		return true;
@@ -706,6 +723,42 @@ void ngp_f(char path[], struct ngp_h *head, const char *out) {
 		fclose(i_file);
 		fclose(o_file);
 	}
+}
+
+void mpa2_f(char path[], struct mpa2_h *head, const char *out){
+
+    head->term0 = 0x2D2D2D3B;
+    char *dir_sep = strrchr(path, '/');
+
+    if (dir_sep == NULL) {
+        dir_sep = path;
+    } else {
+        dir_sep++;
+    }
+
+    char *f_end = strrchr(dir_sep, '.');
+
+    strncpy(head->songtitle, dir_sep, f_end - dir_sep);
+    head->songtitle[f_end - dir_sep] = '\0';
+
+    head->TotalH_size = sizeof(struct mpa2_h);
+    FILE *input_file = fopen(path, "rb");
+	fseek(input_file, 0, SEEK_END);
+	head->term1 = ftell(input_file);
+    FILE *o_file = fopen(out, "wb");
+
+	if(!input_file) {
+		fclose(input_file);
+		fclose(o_file);
+		printf("\nUnable to find: \n %s \n\n", path);
+	} else {
+        fseek(input_file, 0, SEEK_END);
+        head->h_size = 44;
+		fwrite(head, 1, sizeof(*head), o_file);
+		fclose(input_file);
+		fclose(o_file);
+	}
+
 }
 
 void L_Seq(char *path){
@@ -1595,6 +1648,79 @@ void selectFile(char *path) {
 			fclose(emu);
 			L_Seq(path);
 		}
+	} else if (pathlen > 4 && !strcasecmp(path + pathlen - 4, ".txt")) {
+		u32 romsize = 0;
+		total_bytes = 0,bytes = 0;
+		const char *txt_bin;
+		if (settings.txtmode_s)
+			txt_bin = "/scfw/txt_s.gba";
+		else
+			txt_bin = "/scfw/txt.gba";
+		FILE *txt = fopen(txt_bin, "rb");
+		if (!txt) {
+			iprintf("Checking %s\n",txt_bin);
+			u_prompt("No eBook ROM found!\n\n");
+			fclose(txt);
+		} else {
+			fseek(txt,0,SEEK_END);
+			romsize = ftell(txt);
+			romSize = romsize;
+			fseek(txt, 0, SEEK_SET);
+			iprintf("Loading eBook reader \n\n");
+			FlashROM(path,pathlen,txt,romSize,false);
+			FILE *rom = fopen(path, "rb");
+			fseek(rom, 0, SEEK_END);
+			romsize = ftell(rom);
+			romSize += romsize;
+			fseek(rom, 0, SEEK_SET);
+			iprintf("Loading txt file:\n\n");
+			FlashROM(path,pathlen,rom,romSize,true);
+			fclose(rom);
+			fclose(txt);
+			L_Seq(path);
+		}
+	} else if ((pathlen > 4 && !strcasecmp(path + pathlen - 4, ".mpa")) || (pathlen > 5 && !strcasecmp(path + pathlen - 5, ".mpac"))){
+		u32 romsize = 0;
+		total_bytes = 0,bytes = 0;
+		const char *mpa_bin = "/scfw/mpa.gba";
+		FILE *mpa = fopen(mpa_bin, "rb");
+		FILE *out_h;
+		if (!mpa) {
+			iprintf("Checking %s\n",mpa_bin);
+			u_prompt("No Music Player Advance found!\n\n");
+			fclose(mpa);
+		} else {
+			fseek(mpa,0,SEEK_END);
+			romsize = ftell(mpa);
+			romSize = romsize;
+			fseek(mpa, 0, SEEK_SET);
+			iprintf("Loading Music Player Advance \n\n");
+			FlashROM(path,pathlen,mpa,romSize,false);
+			if(!strcasecmp(path + pathlen - 4, ".mpa")){
+				//test
+				struct mpa2_h head0;
+				const char *output_path = "/scfw/mpa_0.dat";
+				mpa2_f(path, &head0, output_path);
+				out_h = fopen(output_path, "rb");
+				fseek(out_h,0,SEEK_END);
+				romsize = ftell(out_h);
+				romSize += romsize;
+				fseek(out_h, 0, SEEK_SET);
+				FlashROM(path,pathlen,out_h,romSize,false);
+			}
+			FILE *rom = fopen(path, "rb");
+			fseek(rom, 0, SEEK_END);
+			romsize = ftell(rom);
+			romSize += romsize;
+			fseek(rom, 0, SEEK_SET);
+			iprintf("Loading music file\n\n");
+			FlashROM(path,pathlen,rom,romSize,true);
+			fclose(rom);
+			if(!strcasecmp(path + pathlen - 4, ".mpa"))
+				fclose(out_h);
+			fclose(mpa);
+			L_Seq(path);
+		}
 	} else {
 		u_prompt("Unrecognised file extension!\n");
 	}
@@ -1603,7 +1729,7 @@ void selectFile(char *path) {
 void change_settings(char *path) {
 	for (int cursor = 0;;) {
 		iprintf("\x1b[2J"
-		        "SCFW Kernel v0.5.2-DrSMS \nGBA-mode\n\n");
+		        "SCFW Kernel v0.5.2-MPA \nGBA-mode\n\n");
 		
 		iprintf("%cAutosave: %i\n", cursor == 0 ? '>' : ' ', settings.autosave);
 		iprintf("%cSRAM Patch: %i\n", cursor == 1 ? '>' : ' ', settings.sram_patch);
@@ -1612,10 +1738,11 @@ void change_settings(char *path) {
 		iprintf("%cBoot games through BIOS: %i\n", cursor == 4 ? '>' : ' ', settings.biosboot);
 		iprintf("%cAutosave after cold boot: %i\n", cursor == 5 ? '>' : ' ', settings.cold_boot_save);
 		iprintf("%cDrSMS over SMSAdvance: %i\n", cursor == 6 ? '>' : ' ', settings.DrSMS_prio);
-		iprintf("%c[SMSAdvance] Load BIOS: %i\n", cursor == 7 ? '>' : ' ', settings.smsa_bios);
-		iprintf("%c[WasabiGBA] Load BIOS: %i\n", cursor == 8 ? '>' : ' ', settings.wsv_bios);
-		iprintf("%c[NGPGBA] Load BIOS: %i\n", cursor == 9 ? '>' : ' ', settings.ngp_bios);
-		iprintf("%c[SwanGBA] Load BIOS: %i\n", cursor == 10 ? '>' : ' ', settings.bwsc_bios);
+		iprintf("%cRead txt files sideways: %i\n", cursor == 7 ? '>' : ' ', settings.txtmode_s);
+		iprintf("%c[SMSAdvance] Load BIOS: %i\n", cursor == 8 ? '>' : ' ', settings.smsa_bios);
+		iprintf("%c[WasabiGBA] Load BIOS: %i\n", cursor == 9 ? '>' : ' ', settings.wsv_bios);
+		iprintf("%c[NGPGBA] Load BIOS: %i\n", cursor == 10 ? '>' : ' ', settings.ngp_bios);
+		iprintf("%c[SwanGBA] Load BIOS: %i\n", cursor == 11 ? '>' : ' ', settings.bwsc_bios);
 		
 		do {
 			scanKeys();
@@ -1647,15 +1774,18 @@ void change_settings(char *path) {
 				settings.DrSMS_prio = !settings.DrSMS_prio;
 				break;
 			case 7:
-				settings.smsa_bios = !settings.smsa_bios;
+				settings.txtmode_s = !settings.txtmode_s;
 				break;
 			case 8:
-				settings.wsv_bios = !settings.wsv_bios;
+				settings.smsa_bios = !settings.smsa_bios;
 				break;
 			case 9:
-				settings.ngp_bios = !settings.ngp_bios;
+				settings.wsv_bios = !settings.wsv_bios;
 				break;
 			case 10:
+				settings.ngp_bios = !settings.ngp_bios;
+				break;
+			case 11:
 				settings.bwsc_bios = !settings.bwsc_bios;
 				break;
 			}
@@ -1666,12 +1796,12 @@ void change_settings(char *path) {
 		if (pressed & KEY_UP) {
 			--cursor;
 			if (cursor < 0)
-				cursor += 11;
+				cursor += 12;
 		}
 		if (pressed & KEY_DOWN) {
 			++cursor;
-			if (cursor > 10)
-				cursor -= 11;
+			if (cursor > 11)
+				cursor -= 12;
 		}
 	}
 	
@@ -1698,7 +1828,7 @@ int main() {
 
 	consoleDemoInit();
 
-	iprintf("SCFW Kernel v0.5.2-DrSMS \nGBA-mode\n\n");
+	iprintf("SCFW Kernel v0.5.2-MPA \nGBA-mode\n\n");
 	
 	*(vu16*) 0x04000204	 = 0x40c0;
 	if (overclock_ewram())
