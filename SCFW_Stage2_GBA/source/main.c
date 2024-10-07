@@ -2,9 +2,10 @@
 #include <fat.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.H>
+#include <string.h>
 
 #include "my_io_scsd.h"
+#include "new_scsdio.h"
 
 #define GBA_ROM ((vu32*) 0x08000000)
 
@@ -14,17 +15,6 @@ enum
 	SC_MEDIA = 0x3,
 	SC_RAM_RW = 0x5,
 };
-
-void sc_mode(u32 mode)
-{
-    u32 ime = REG_IME;
-    REG_IME = 0;
-    *(vu16*)0x9FFFFFE = 0xA55A;
-    *(vu16*)0x9FFFFFE = 0xA55A;
-    *(vu16*)0x9FFFFFE = mode;
-    *(vu16*)0x9FFFFFE = mode;
-    REG_IME = ime;
-}
 
 
 void tryAgain() {
@@ -49,7 +39,7 @@ int main() {
 
 	consoleDemoInit();
 
-	iprintf("SCFW v0.5.2 GBA-mode\n\n");
+	iprintf("SCSFW GBA-mode\n\n");
 
 	_my_io_scsd.startup();
 	if (fatMountSimple("fat", &_my_io_scsd)) {
@@ -84,12 +74,12 @@ int main() {
 		for (u32 i = 0; i < bytes; i += 4) {
 			GBA_ROM[(i + total_bytes) >> 2] = *(vu32*) &filebuf[i];
 			if (GBA_ROM[(i + total_bytes) >> 2] != *(vu32*) &filebuf[i]) {
-				iprintf("\x1b[1A\x1b[KSDRAM write failed at\n0x%x\n\n", i + total_bytes);
+				iprintf("\x1b[1A\x1b[KSDRAM write failed at\n0x%x\n\n", (int)(i + total_bytes));
 			}
 		}
 		sc_mode(SC_MEDIA);
 		total_bytes += bytes;
-		iprintf("\x1b[1A\x1b[K0x%x/0x%x\n", total_bytes, kernel_size);
+		iprintf("\x1b[1A\x1b[K0x%x/0x%x\n", (int)total_bytes, (int)kernel_size);
 	} while (bytes);
 
 	if (ferror(kernel)) {

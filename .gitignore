@@ -1,0 +1,9 @@
+*/build
+*.nds
+*.gba
+*.elf
+*.frm
+*.out
+data/*.bin
+.vscode
+*.DS_Store

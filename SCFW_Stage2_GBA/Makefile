@@ -25,15 +25,17 @@ INCLUDES	:=
 #---------------------------------------------------------------------------------
 # options for code generation
 #---------------------------------------------------------------------------------
-ARCH	:=	-v -mthumb -mthumb-interwork
+ARCH	:=	-mthumb -mthumb-interwork
 
-CFLAGS	:=	-g -Wall -O0 -std=c99\
+CFLAGS	:=	-g -Wall -O3 \
 		-mcpu=arm7tdmi -mtune=arm7tdmi\
 		$(ARCH)
 
 CFLAGS	+=	$(INCLUDE)
 
 CXXFLAGS	:=	$(CFLAGS) -fno-rtti -fno-exceptions
+
+CFLAGS +=  -std=gnu99
 
 ASFLAGS	:=	$(ARCH)
 LDFLAGS	=	-g $(ARCH) -Wl,-Map,$(notdir $@).map

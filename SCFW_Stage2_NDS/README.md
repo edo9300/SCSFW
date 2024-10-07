@@ -1,1 +1,1 @@
-Dummy for now, just http://www.cryptosystem.org/archives/2007/01/simple-gba-mode-switcher/
+Hbmenu https://github.com/devkitPro/nds-hb-menu/releases/v0.9.0 dldi patched with [scsd-sdhc-dldi.dldi](https://github.com/ArcheyChen/SuperCard-SDHC-DLDI)

@@ -1,37 +1,30 @@
-# SCFW: Custom Firmware & Kernel for Supercard
+# SCSFW Simple firmware for the Supercard
 
-SCFW is a custom firmware and kernel for the Supercard SD.
-Currently it is in a preview state with minimum functionality.
+Simple firmware replacement for the Supercard based off [metroid maniac's](https://github.com/metroid-maniac/SCFW) [SCFW](https://github.com/metroid-maniac/SCFW).
+The gba kernel part got stripped out from the SCFW repo, and only the firmware related code is left.
+The gba side was left unchanged in behaviour from SCFW, but the used dldi was updated to the latest version from https://github.com/ArcheyChen/SuperCard-SDHC-DLDI.
+The passme mode instead now is set up to boot devkitpro's [nds-hbmenu](https://github.com/devkitPro/nds-hb-menu)
 
 ## Installation
-Download the current release and copy the scfw folder to the root of your SD card.  
-That's it! You can now use the kernel by loading scfw/kernel.gba from the official firmware.  
-You can also select the firmware.frm file from within the kernel to flash SCFW to the Supercard's firmware. Because the firmware is minimal and the kernel is loaded from the SD card, updates to the firmware should be rare. You can enjoy kernel updates without updating the firmware.
+Set up [SCFW](https://github.com/metroid-maniac/SCFW) on your supercard, and launch the `firmware.frm` from it to flash it.
 
-## Current features
-- Can browse files
-- Can load a GBA ROM
-- Can flash a Supercard firmware.
-- Automatic SRAM, waitstate, and prefetch patching (buggy)
-- Automatic SRAM loading & saving
-- Manual SRAM management
-- SDHC
-- Soft reset patch
-## Planned features
-- Nicer file browser
-- Support for more filetypes with builtin goomba/pocketnes etc.
-- NDS mode
-- Code cleanup, lots of it.
-- Cache patches after creating them to increase loading speed
-- Faster loading speeds
-- Cheats(?)
-- Save states(?)
-## Links
-GBATemp discussion thread  
-https://gbatemp.net/threads/scfw-custom-firmware-kernel-for-supercard.647238/  
+## Usage
+To use in GBA mode, a setup with SCFW is expected
+When used in passme mode, nds hbmenu will be loaded, and from there other homebrews can be loaded from the SD
+
+## Building
+With devkitpro set up for gba development, with libgba and libfat-gba installed, run `make` in the `SCFW_Stage2_GBA` folder.
+
+If you want to use a different ds homebrew from hbmenu, replace the `SCFW_Stage2_NDS.NDS` file in the `SCFW_Stage2_NDS`, if dldi patching is required, patch it with `scsd-sdhc-dldi.dldi`
+
+Assuming you have the devkitpro tools in your path, run from the `SCFW_Stage1` folder
+```
+arm-eabi-as scfw.s && arm-eabi-objcopy -O binary a.out firmware.frm && gbafix firmware.frm
+```
+
+Keep in mind that the final `firmware.frm` file must not be bigger than `0x80000` bytes
 
 ## Credits
-[metroid maniac](https://github.com/metroid-maniac) - Main developer  
-[Archeychen](https://github.com/ArcheyChen) - Early development into another loader, SDHC support  
-[RocketRobz](https://github.com/RocketRobz) - Twilightmenu++ "gbapatcher" code for patching Supercard ROMs  
+[metroid maniac](https://github.com/metroid-maniac) - SCFW and the gba loader code  
+[Archeychen](https://github.com/ArcheyChen) - SDHC support  
 [SiliconExarch](https://github.com/SiliconExarch) - Finding an old DevkitARM release with a functioning Supercard SD drive
