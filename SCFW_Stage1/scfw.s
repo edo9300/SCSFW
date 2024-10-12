@@ -18,9 +18,11 @@ cart_base:
 
 
 .org 0xc0
+.set supercard_switch_mode_offset, 0x9000
 entrypoint:
 	# copy and run this fn from RAM
 	mov r0, #0x02000000
+	add r0, r0, $supercard_switch_mode_offset
 	adr r1, sc_mode_flash_rw
 	adr r2, sc_mode_flash_rw_end
 sc_mode_flash_rw_loop:
@@ -28,11 +30,15 @@ sc_mode_flash_rw_loop:
 	str r3, [r0], # 4
 	cmp r1, r2
 	blt sc_mode_flash_rw_loop
+# jumps to sc_mode_flash_rw copied to address 0x02009000
+	mov r0, #0x02000000
+	add r0, r0, $supercard_switch_mode_offset
 	mov lr, pc
-	mov pc, # 0x02000000
+	mov pc, r0
 	
 	# detect GBA/NDS using mirroring
 	mov r0, # 0x02000000
+	add r0, r0, $supercard_switch_mode_offset
 	mov r2, # 0
 	str r2, [r0]
 	add r1, r0, #0x00040000
@@ -57,9 +63,25 @@ load_gba_loop:
 	bx lr
 # load & execute nds rom
 load_nds:
+#libnds crt clears those important values from the header, back them up to an unused
+#area of the header to then be retrieved manually later
+	mov r0, # 0x02800000
+	sub r0, r0, # 0x200
+	add r1, r0, #0x80
+	add r2, r0, #0x88
+	add r3, r0, #0x94
+backup_header_contents_loop:
+	ldr r4, [r1], # 4
+	str r4, [r3], # 4
+	cmp r1, r2
+	blt backup_header_contents_loop
 	adrl r0, nds_rom
+
+	#arm9 rom_offset
 	ldr r1, [r0, # 0x20]
+	#arm9 ram_address (destination)
 	ldr r2, [r0, # 0x28]
+	#arm9 size
 	ldr r3, [r0, # 0x2c]
 	add r1, r1, r0 
 	add r3, r3, r1
@@ -68,8 +90,11 @@ load_nds_arm9_loop:
 	str r4, [r2], # 4
 	cmp r1, r3
 	blt load_nds_arm9_loop
+	#arm7 rom_offset
 	ldr r1, [r0, # 0x30]
+	#arm7 ram_address (destination)
 	ldr r2, [r0, # 0x38]
+	#arm7 size
 	ldr r3, [r0, # 0x3c]
 	add r1, r1, r0
 	add r3, r3, r1
