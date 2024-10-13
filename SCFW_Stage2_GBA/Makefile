@@ -18,7 +18,7 @@ include $(DEVKITARM)/gba_rules
 #---------------------------------------------------------------------------------
 TARGET		:=	$(shell basename $(CURDIR))_mb
 BUILD		:=	build
-SOURCES		:=	source
+SOURCES		:=	source source/fatfs
 DATA		:=	
 INCLUDES	:=
 
@@ -48,7 +48,7 @@ export PATH	:=	$(DEVKITARM)/bin:$(PATH)
 #---------------------------------------------------------------------------------
 # any extra libraries we wish to link with the project
 #---------------------------------------------------------------------------------
-LIBS	:=	-lfat -lgba
+LIBS	:=	-lgba
 
 #---------------------------------------------------------------------------------
 # list of directories containing libraries, this must be the top level containing

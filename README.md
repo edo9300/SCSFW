@@ -19,7 +19,7 @@ If you want to use a different ds homebrew from hbmenu, replace the `SCFW_Stage2
 
 Assuming you have the devkitpro tools in your path, run from the `SCFW_Stage1` folder
 ```
-arm-eabi-as scfw.s && arm-eabi-objcopy -O binary a.out firmware.frm && gbafix firmware.frm
+arm-none-eabi-as scfw.s && arm-none-eabi-objcopy -O binary a.out firmware.frm && gbafix firmware.frm
 ```
 
 Keep in mind that the final `firmware.frm` file must not be bigger than `0x80000` bytes
