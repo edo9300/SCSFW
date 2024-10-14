@@ -9,8 +9,7 @@
 
 #include "ff.h"			/* Obtains integer types */
 #include "diskio.h"		/* Declarations of disk functions */
-#include <stdbool.h>
-#include "../my_io_scsd.h"
+#include "../new_scsdio.h"
 
 static bool initialized = false;
 static bool drive_present = false;
@@ -26,10 +25,11 @@ DSTATUS disk_status (BYTE pdrv)
 
 DSTATUS disk_initialize (BYTE pdrv)
 {
-	if(!_my_io_scsd.isInserted())
+    sc_mode(en_sdram + en_sdcard);
+	if(!MemoryCard_IsInserted())
 		return STA_NODISK;
 	drive_present = true;
-	if(!_my_io_scsd.startup())
+	if(!init_sd())
 		return STA_NOINIT;
 	initialized = true;
 	return 0;
@@ -37,5 +37,7 @@ DSTATUS disk_initialize (BYTE pdrv)
 
 DRESULT disk_read(BYTE pdrv, BYTE *buff, LBA_t sector, UINT count)
 {
-	return _my_io_scsd.readSectors(sector, count, buff) ? RES_OK : RES_ERROR;
+    sc_mode(en_sdram + en_sdcard);
+    ReadSector(buff,sector,count);
+	return RES_OK;
 }

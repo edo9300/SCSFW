@@ -10,7 +10,7 @@ static bool isSDHC;
 uint8_t _SD_CRC7(uint8_t* pBuf, int len);
 bool SCSD_readData(void* buffer);
 
-uint64_t sdio_crc16_4bit_checksum(uint32_t* data, uint32_t num_words);
+// uint64_t sdio_crc16_4bit_checksum(uint32_t* data, uint32_t num_words);
 inline uint16_t setFastCNT(uint16_t originData) {
 	/*  2-3   32-pin GBA Slot ROM 1st Access Time (0-3 = 10, 8, 6, 18 cycles)
 		4     32-pin GBA Slot ROM 2nd Access Time (0-1 = 6, 4 cycles)*/
@@ -21,33 +21,6 @@ inline uint16_t setFastCNT(uint16_t originData) {
 vu16* const EXMEMCNT_ADDR = (vu16*)0x4000204;
 
 void get_resp_drop(int dropBytes = 6);
-void WriteSector(u8* buff, u32 sector, u32 writenum) {
-	uint64_t crc16;//并行4个
-	sc_mode(en_sdcard);
-	sc_sdcard_reset();
-	auto param = isSDHC ? sector : (sector << 9);
-	if(writenum == 1) {
-		SDCommand(24, param);
-		get_resp_drop();
-		crc16 = sdio_crc16_4bit_checksum((u32*)(buff), 512 / sizeof(u32));
-		sd_data_write((u16*)(buff), (u8*)(&crc16));
-	} else {
-		SDCommand(25, param);
-		get_resp_drop();
-		for(auto buffEnd = buff + writenum * 512; buff < buffEnd; buff += 512) {
-			crc16 = sdio_crc16_4bit_checksum((u32*)(buff), 512 / sizeof(u32));
-			sd_data_write((u16*)(buff), (u8*)(&crc16));
-			send_clk(0x10);
-		}
-		SDCommand(12, 0);
-		get_resp_drop();
-	}
-	send_clk(0x10);
-	vu16* wait_busy = (vu16*)sd_dataadd;
-	while(((*wait_busy) & 0x0100) == 0)
-		;
-	return;
-}
 
 void ReadSector(uint8_t* buff, uint32_t sector, uint32_t readnum) {
 	u16 originMemStat = *EXMEMCNT_ADDR;
@@ -72,125 +45,6 @@ void ReadSector(uint8_t* buff, uint32_t sector, uint32_t readnum) {
 
 #define BUSY_WAIT_TIMEOUT 500000
 #define SCSD_STS_BUSY 0x100
-
-void sd_data_write(u16* buff, u8* crc16buff) {
-	u16 originMemStat = *EXMEMCNT_ADDR;
-	*EXMEMCNT_ADDR = setFastCNT(originMemStat);
-	vu16* const wait_busy = (vu16*)sd_dataadd;
-	vu16* const data_write_u16 = (vu16*)sd_dataadd;
-	vu32* const data_write_u32 = (vu32*)sd_dataadd;
-	while(!((*wait_busy) & SCSD_STS_BUSY))
-		; // Note:两边的等待是不一致的
-	*wait_busy;
-
-	*data_write_u16 = 0; // start bit
-
-	auto writeU16 = [data_write_u32](uint32_t data)//lambda Function
-	{
-		// data |= (data << 20);    //strange, it works without
-		*data_write_u32 = data;
-		*data_write_u32 = (data >> 8);
-	};
-	// auto writeU32 = [data_write_u32](uint32_t data)//lambda Function
-	//     {
-	//         *data_write_u32 = data;
-	//         *data_write_u32 = (data >> 8);
-	//         *data_write_u32 = (data >> 16);
-	//         *data_write_u32 = (data >> 24);//居然能用,但是好像镜像只镜像到ADDR + 4
-	//     };
-
-#define WRITE_U16 \
-    "ldrh r0, [%0], #2\n" \
-    "lsr r1, r0, #8\n" \
-    "stmia %1, {r0-r1}\n"
-#define WRITE_U32 \
-    "ldr r0, [%0], #4\n"   \
-    "lsr r1, r0, #8\n"     \
-    "lsr r2, r0, #16\n"    \
-    "lsr r3, r0, #24\n"    \
-    "stmia %1, {r0-r1}\n"   \
-    "stmia %1, {r2-r3}\n"
-
-	if((u32)buff & 3) {//unaligned
-		u8* buff_u8 = (u8*)buff;
-		u16 byteHI;
-		u16 byteLo;
-		for(int i = 0; i < 512; i += 2) {
-			byteLo = *buff_u8++;
-			byteHI = *buff_u8++;
-			writeU16((byteHI << 8) | byteLo);
-		}
-	} else if((u32)buff & 2) {//u16 aligned
-		asm volatile(
-			WRITE_U16
-			WRITE_U32
-			"1:\n"
-			WRITE_U32
-			WRITE_U32
-			"cmp %0, %2\n"
-			"blt 1b\n"
-			WRITE_U16
-			: // 没有输出
-		: "r"((u32)buff), "r"((u32)data_write_u32), "r"(((u32)buff) + 510/*512-2*/)
-			: "r0", "r1", "r2", "r3", "cc"// 破坏列表
-			);
-	} else {//u32 aligned
-		asm volatile(
-			"2:\n"
-			WRITE_U32
-			WRITE_U32
-			"cmp %0, %2\n"
-			"blt 2b"
-			: // 没有输出
-		: "r"((u32)buff), "r"((u32)data_write_u32), "r"(((u32)buff) + 512)
-			: "r0", "r1", "r2", "r3", "cc"// 破坏列表
-			);
-		// u32 *buff_u32 = (u32*)buff;
-		// for (int i = 0; i < 512; i += 4){
-		//     writeU32(*buff_u32++);
-		// }//or?
-		// for (int i = 0; i < 512; i += 2){
-		//     writeU16(*buff++);
-		// }
-	}
-
-
-	if((u32)crc16buff & 1) {
-		u16 byteHI;
-		u16 byteLo;
-		for(int i = 0; i < 4; i++) {
-			byteLo = *crc16buff++;
-			byteHI = *crc16buff++;
-			writeU16((byteHI << 8) | byteLo);
-		}
-	} else if((u32)crc16buff & 2) {
-		asm volatile(
-			WRITE_U16
-			WRITE_U16
-			WRITE_U16
-			WRITE_U16
-			: // 没有输出
-		: "r"((u32)crc16buff), "r"((u32)data_write_u32)
-			: "r0", "r1", "r2", "r3", "cc"// 破坏列表
-			);
-	} else {
-		asm volatile(
-			WRITE_U32
-			WRITE_U32
-			: // 没有输出
-		: "r"((u32)crc16buff), "r"((u32)data_write_u32)
-			: "r0", "r1", "r2", "r3", "cc"// 破坏列表
-			);
-		// for (int i = 0; i < 4; i++)
-		// {
-		//     writeU16(*crc16buff++);
-		// }
-	}
-	*data_write_u16 = 0xFF; // end bit
-	while(((*wait_busy) & SCSD_STS_BUSY))
-		; // Note:这个部分与上个部分是不一样的
-	*EXMEMCNT_ADDR = originMemStat;
-}
 void sc_mode(u16 mode) {
 	u32 ime = REG_IME;
 	REG_IME = 0;
@@ -423,25 +277,6 @@ bool MemoryCard_IsInserted(void) {
 	return (status & 0x300) == 0;
 }
 
-uint64_t inline calSingleCRC16(uint64_t crc, uint32_t data_in) {
-	// Shift out 8 bits for each line
-	uint32_t data_out = crc >> 32;
-	crc <<= 32;
-
-	// XOR outgoing data to itself with 4 bit delay
-	data_out ^= (data_out >> 16);
-
-	// XOR incoming data to outgoing data with 4 bit delay
-	data_out ^= (data_in >> 16);
-
-	// XOR outgoing and incoming data to accumulator at each tap
-	uint64_t xorred = data_out ^ data_in;
-	crc ^= xorred;
-	crc ^= xorred << (5 * 4);
-	crc ^= xorred << (12 * 4);
-	return crc;
-}
-
 uint32_t loadBigEndU32_u8(u8*& dataBuf) {
 	u32 data;
 	data = (*dataBuf++) << 24;
@@ -450,27 +285,7 @@ uint32_t loadBigEndU32_u8(u8*& dataBuf) {
 	data |= (*dataBuf++);
 	return data;
 }
-uint64_t sdio_crc16_4bit_checksum(uint32_t* dataBuf, uint32_t num_words) {
-	uint64_t crc = 0;
-	if((uintptr_t)dataBuf & 3) {//u8 align
-		uint8_t* data = (u8*)dataBuf;
-		uint8_t* end = (u8*)(dataBuf + num_words);
-		while(data < end) {
-			uint32_t data_in = loadBigEndU32_u8(data);
-			crc = calSingleCRC16(crc, data_in);
-		}
-	} else {
-		uint32_t* data = dataBuf;
-		uint32_t* end = dataBuf + num_words;
-		while(data < end) {
-			uint32_t data_in = __builtin_bswap32(*data++);
-			crc = calSingleCRC16(crc, data_in);
-		}
-	}
 
-
-	return __builtin_bswap64(crc);
-}
 bool get_resp(u8* dest, u32 length) {
 	u32 i;
 	int numBits = length * 8;
