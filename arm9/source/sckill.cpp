@@ -14,6 +14,8 @@
 #define SC_MODE_FLASH_RW_LITE	(u16)0x1510
 
 
+#define SCLITE_FLASH_MAGIC_ADDR_1	(*(vu16*) 0x08000AAA)
+#define SCLITE_FLASH_MAGIC_ADDR_2	(*(vu16*) 0x08000554)
 #define SC_FLASH_MAGIC_ADDR_1	(*(vu16*) 0x08000b92)
 #define SC_FLASH_MAGIC_ADDR_2	(*(vu16*) 0x0800046c)
 #define SC_FLASH_MAGIC_1		((u16) 0xaa)
@@ -79,173 +81,10 @@ void sc_flash_rw_enable() {
 }
 
 void sc_flash_rw_enable_lite() {
-	bool buf = REG_IME;
-	REG_IME = 0;
 	SC_MODE_REG = SC_MODE_MAGIC;
 	SC_MODE_REG = SC_MODE_MAGIC;
 	SC_MODE_REG = SC_MODE_FLASH_RW_LITE;
 	SC_MODE_REG = SC_MODE_FLASH_RW_LITE;
-	REG_IME = buf;
-}
-
-
-void Block_Erase(u32 blockAdd, bool displayProgress) {
-	vu16 v1, v2;  
-	u32 loop = 0, Address = blockAdd;
-	
-	if (displayProgress && !UpdateProgressText) {
-		textBuffer = "\n    Death 2 supercard lite :3\n\n\n      Erasing whole chip\n\n\n        Erased ";
-		statData = (FlashBase);
-		UpdateProgressText = true;
-	}
-	
-	if((blockAdd == 0) || (blockAdd == 0x40000)) {
-		for(loop = 0; loop < 0x40000; loop += 0x8000) {
-			*((vu16 *)(FlashBase+0x555*2)) = 0xAA;
-			*((vu16 *)(FlashBase+0x2AA*2)) = 0x55;
-			*((vu16 *)(FlashBase+0x555*2)) = 0x80;
-			*((vu16 *)(FlashBase+0x555*2)) = 0xAA;
-			*((vu16 *)(FlashBase+0x2AA*2)) = 0x55;
-			*((vu16 *)(FlashBase+Address+loop)) = 0x30;
-			
-			*((vu16 *)(FlashBase+0x1555*2)) = 0xAA;
-			*((vu16 *)(FlashBase+0x12AA*2)) = 0x55;
-			*((vu16 *)(FlashBase+0x1555*2)) = 0x80;
-			*((vu16 *)(FlashBase+0x1555*2)) = 0xAA;
-			*((vu16 *)(FlashBase+0x12AA*2)) = 0x55;
-			*((vu16 *)(FlashBase+Address+loop+0x2000)) = 0x30;
-			
-			*((vu16 *)(FlashBase+0x2555*2)) = 0xAA;
-			*((vu16 *)(FlashBase+0x22AA*2)) = 0x55;
-			*((vu16 *)(FlashBase+0x2555*2)) = 0x80;
-			*((vu16 *)(FlashBase+0x2555*2)) = 0xAA;
-			*((vu16 *)(FlashBase+0x22AA*2)) = 0x55;
-			*((vu16 *)(FlashBase+Address+loop+0x4000)) = 0x30;
-			
-			*((vu16 *)(FlashBase+0x3555*2)) = 0xAA;
-			*((vu16 *)(FlashBase+0x32AA*2)) = 0x55; 
-			*((vu16 *)(FlashBase+0x3555*2)) = 0x80;
-			*((vu16 *)(FlashBase+0x3555*2)) = 0xAA;
-			*((vu16 *)(FlashBase+0x32AA*2)) = 0x55;
-			*((vu16 *)(FlashBase+Address+loop+0x6000)) = 0x30;
-			do {
-				v1 = *((vu16 *)(FlashBase+Address+loop));
-				v2 = *((vu16 *)(FlashBase+Address+loop));
-			} while(v1!=v2);
-			do {
-				v1 = *((vu16 *)(FlashBase+Address+loop+0x2000));
-				v2 = *((vu16 *)(FlashBase+Address+loop+0x2000));
-			} while(v1!=v2);
-			do {
-				v1 = *((vu16 *)(FlashBase+Address+loop+0x4000));
-				v2 = *((vu16 *)(FlashBase+Address+loop+0x4000));
-			} while(v1!=v2);
-			do {
-				v1 = *((vu16 *)(FlashBase+Address+loop+0x6000));
-				v2 = *((vu16 *)(FlashBase+Address+loop+0x6000));
-			} while(v1!=v2);
-		}
-		if (displayProgress && !UpdateProgressText) {
-			textBuffer = "\n    Death 2 supercard lite :3\n\n\n      Erasing whole chip\n\n\n        Erased ";
-			statData = (FlashBase+Address+loop);
-			UpdateProgressText = true;
-		}
-	} else {
-		*((vu16 *)(FlashBase+0x555*2)) = 0xAA;
-		*((vu16 *)(FlashBase+0x2AA*2)) = 0x55;
-		*((vu16 *)(FlashBase+0x555*2)) = 0x80;
-		*((vu16 *)(FlashBase+0x555*2)) = 0xAA;
-		*((vu16 *)(FlashBase+0x2AA*2)) = 0x55;
-		*((vu16 *)(FlashBase+Address)) = 0x30;
-		
-		*((vu16 *)(FlashBase+0x1555*2)) = 0xAA;
-		*((vu16 *)(FlashBase+0x12AA*2)) = 0x55;
-		*((vu16 *)(FlashBase+0x1555*2)) = 0x80;
-		*((vu16 *)(FlashBase+0x1555*2)) = 0xAA;
-		*((vu16 *)(FlashBase+0x12AA*2)) = 0x55;
-		*((vu16 *)(FlashBase+Address+0x2000)) = 0x30;
-		
-		do {
-			v1 = *((vu16 *)(FlashBase+Address));
-			v2 = *((vu16 *)(FlashBase+Address));
-		} while(v1!=v2);
-		do {
-			v1 = *((vu16 *)(FlashBase+Address+0x2000));
-			v2 = *((vu16 *)(FlashBase+Address+0x2000));
-		} while(v1!=v2);
-		
-		*((vu16 *)(FlashBase+0x555*2)) = 0xAA;
-		*((vu16 *)(FlashBase+0x2AA*2)) = 0x55;
-		*((vu16 *)(FlashBase+0x555*2)) = 0x80;
-		*((vu16 *)(FlashBase+0x555*2)) = 0xAA;
-		*((vu16 *)(FlashBase+0x2AA*2)) = 0x55;
-		*((vu16 *)(FlashBase+Address+0x20000)) = 0x30;
-		
-		*((vu16 *)(FlashBase+0x1555*2)) = 0xAA;
-		*((vu16 *)(FlashBase+0x12AA*2)) = 0x55;
-		*((vu16 *)(FlashBase+0x1555*2)) = 0x80;
-		*((vu16 *)(FlashBase+0x1555*2)) = 0xAA;
-		*((vu16 *)(FlashBase+0x12AA*2)) = 0x55;
-		*((vu16 *)(FlashBase+Address+0x2000+0x20000)) = 0x30;
-	
-		do {
-			v1 = *((vu16 *)(FlashBase+Address+0x20000));
-			v2 = *((vu16 *)(FlashBase+Address+0x20000));
-		} while(v1!=v2);
-		do {
-			v1 = *((vu16 *)(FlashBase+Address+0x2000+0x20000));
-			v2 = *((vu16 *)(FlashBase+Address+0x2000+0x20000));
-		} while(v1!=v2);
-		if (displayProgress && !UpdateProgressText) {
-			textBuffer = "\n    Death 2 supercard lite :3\n\n\n      Erasing whole chip\n\n\n        Erased ";
-			statData = (FlashBase+Address+loop);
-			UpdateProgressText = true;
-		}
-	}
-	*GBA_BUS = SC_FLASH_IDLE;
-}
-
-// Modified version of WriteNorFlash from EZFlash 3in1 card lib
-void WriteNorFlash_SCLite(u32 address, u8 *buffer, u32 size, bool displayProgress) {
-	vu16 v1,v2;
-	u32 loopwrite;
-	vu16* buf = (vu16*)buffer;
-	u32 mapaddress;
-	v1 = 0;
-	v2 = 1;
-	
-	mapaddress = address;
-	
-	if (displayProgress && !UpdateProgressText) {
-		textBuffer = "\n\n\n\n\n\n\n\n\n\n\n      Programmed ";
-		statData = FlashBase;
-		UpdateProgressText = true;
-	}
-	
-	for(loopwrite = 0; loopwrite < (size >> 2); loopwrite++) {
-		*((vu16*)(FlashBase+0x555*2)) = 0xAA;
-		*((vu16*)(FlashBase+0x2AA*2)) = 0x55;
-		*((vu16*)(FlashBase+0x555*2)) = 0xA0;
-		*((vu16*)(FlashBase+mapaddress+loopwrite*2)) = buf[loopwrite];
-		*((vu16*)(FlashBase+0x1555*2)) = 0xAA;
-		*((vu16*)(FlashBase+0x12AA*2)) = 0x55;
-		*((vu16*)(FlashBase+0x1555*2)) = 0xA0;			
-		*((vu16*)(FlashBase+mapaddress+0x2000+loopwrite*2)) = buf[0x1000+loopwrite];
-		do {
-			v1 = *((vu16*)(FlashBase+mapaddress+loopwrite*2));
-			v2 = *((vu16*)(FlashBase+mapaddress+loopwrite*2));
-		} while(v1 != v2);
-		do {
-			v1 = *((vu16*)(FlashBase+mapaddress+0x2000+loopwrite*2));
-			v2 = *((vu16*)(FlashBase+mapaddress+0x2000+loopwrite*2));
-		} while(v1 != v2);
-		if (displayProgress && !UpdateProgressText) {
-			textBuffer = "\n\n\n\n\n\n\n\n\n\n\n      Programmed ";
-			statData = (FlashBase+(loopwrite*2));
-			UpdateProgressText = true;
-		}
-	}
-	*GBA_BUS = SC_FLASH_IDLE;
 }
 
 void sc_flash_erase_chip() {
@@ -258,12 +97,24 @@ void sc_flash_erase_chip() {
 	SC_FLASH_MAGIC_ADDR_2 = SC_FLASH_MAGIC_2;
 	SC_FLASH_MAGIC_ADDR_1 = SC_FLASH_ERASE_CHIP;
 	
-	while (*GBA_BUS != *GBA_BUS)swiWaitForVBlank();
+	while (*GBA_BUS != *GBA_BUS);
 	*GBA_BUS = SC_FLASH_IDLE;
 	REG_IME = buf;
 }
 
-void sc_flash_erase_block(vu16 *addr) {
+void sclite_flash_erase_chip() {
+	SCLITE_FLASH_MAGIC_ADDR_1 = SC_FLASH_MAGIC_1;
+	SCLITE_FLASH_MAGIC_ADDR_2 = SC_FLASH_MAGIC_2;
+	SCLITE_FLASH_MAGIC_ADDR_1 = SC_FLASH_ERASE;
+	SCLITE_FLASH_MAGIC_ADDR_1 = SC_FLASH_MAGIC_1;
+	SCLITE_FLASH_MAGIC_ADDR_2 = SC_FLASH_MAGIC_2;
+	SCLITE_FLASH_MAGIC_ADDR_1 = SC_FLASH_ERASE_CHIP;
+	
+	while (*GBA_BUS != *GBA_BUS);
+	*GBA_BUS = SC_FLASH_IDLE;
+}
+
+/*void sc_flash_erase_block(vu16 *addr) {
 	bool buf = REG_IME;
 	REG_IME = 0;
 	SC_FLASH_MAGIC_ADDR_1 = SC_FLASH_MAGIC_1;
@@ -273,10 +124,23 @@ void sc_flash_erase_block(vu16 *addr) {
 	SC_FLASH_MAGIC_ADDR_2 = SC_FLASH_MAGIC_2;
 	*addr = SC_FLASH_ERASE_BLOCK;
 	
-	while (*GBA_BUS != *GBA_BUS)swiWaitForVBlank();
+	// while (*GBA_BUS != *GBA_BUS)swiWaitForVBlank();
+	while (*GBA_BUS != *GBA_BUS);
 	*GBA_BUS = SC_FLASH_IDLE;
 	REG_IME = buf;
 }
+
+void sclite_flash_erase_block(vu16 *addr) {
+	SCLITE_FLASH_MAGIC_ADDR_1 = SC_FLASH_MAGIC_1;
+	SCLITE_FLASH_MAGIC_ADDR_2 = SC_FLASH_MAGIC_2;
+	SCLITE_FLASH_MAGIC_ADDR_1 = SC_FLASH_ERASE;
+	SCLITE_FLASH_MAGIC_ADDR_1 = SC_FLASH_MAGIC_1;
+	SCLITE_FLASH_MAGIC_ADDR_2 = SC_FLASH_MAGIC_2;
+	*addr = SC_FLASH_ERASE_BLOCK;
+	
+	while (*GBA_BUS != *GBA_BUS);
+	*GBA_BUS = SC_FLASH_IDLE;
+}*/
 
 void sc_flash_program(vu16 *addr, u16 val) {
 	bool buf = REG_IME;
@@ -285,12 +149,20 @@ void sc_flash_program(vu16 *addr, u16 val) {
 	SC_FLASH_MAGIC_ADDR_2 = SC_FLASH_MAGIC_2;
 	SC_FLASH_MAGIC_ADDR_1 = SC_FLASH_PROGRAM;
 	*addr = val;
-	
-	while (*GBA_BUS != *GBA_BUS)swiWaitForVBlank();
-	
+	while (*GBA_BUS != *GBA_BUS);
 	*GBA_BUS = SC_FLASH_IDLE;
 	REG_IME = buf;
 }
+
+void sclite_flash_program(vu16 *addr, u16 val) {
+	SCLITE_FLASH_MAGIC_ADDR_1 = SC_FLASH_MAGIC_1;
+	SCLITE_FLASH_MAGIC_ADDR_2 = SC_FLASH_MAGIC_2;
+	SCLITE_FLASH_MAGIC_ADDR_1 = SC_FLASH_PROGRAM;
+	*addr = val;
+	while (*GBA_BUS != *GBA_BUS);
+	*GBA_BUS = SC_FLASH_IDLE;
+}
+
 
 bool DoFlash() {
 	sc_flash_rw_enable();
@@ -317,26 +189,35 @@ bool DoFlash() {
 
 bool DoFlash_Lite() {
 	sc_flash_rw_enable_lite();
-	
-	for (int i = 0; i < 30; i++)swiWaitForVBlank();
-	
-	for(u32 offset = 0; offset < MaxFirmSize; offset += 0x40000)Block_Erase(offset, true);
-	
-	printf("\n\n\n      Erased whole chip\n");
-	
+	sc_flash_rw_enable_lite();
+	printf("\n    Death 2 supercard lite :3\n");
+	printf("      Erasing whole chip\n");
+	sclite_flash_erase_chip();
+	/*for (u32 addr = 0; addr < 0x80000; addr += 0x2000) {
+		if (!UpdateProgressText) {
+			textBuffer = "\n\n\n\n\n\n\n\n\n\n\n        Erased ";
+			statData = (FlashBase+addr);
+			UpdateProgressText = true;
+		}
+		sclite_flash_erase_block((vu16*)(FlashBase+addr));
+	}*/
+	printf("      Erased whole chip\n");
 	for (int i = 0; i < 60; i++)swiWaitForVBlank();
-		
-	WriteNorFlash_SCLite(0, scfw_buffer, MaxFirmSize, true);
-		
+	for (u32 off = 0; off < firmSize; off += 2) {
+		u16 val = 0;
+		val |= scfw_buffer[off];
+		val |= (scfw_buffer[off+1] << 8);
+		sclite_flash_program((vu16*)(FlashBase+off), val);
+		if (!UpdateProgressText && !(off & 0x00ff)) {
+			textBuffer = "\n\n\n\n\n\n\n\n\n\n\n      Programmed ";
+			statData = (FlashBase+off);
+			UpdateProgressText = true;
+		}
+	}
 	while(UpdateProgressText)swiWaitForVBlank();
-	
-	for (int i = 0; i < 60; i++)swiWaitForVBlank();
-	
 	printf("\n\n\n\n\n      Ded!\n");
-	
-	return true;
+	return false;
 }
-
 
 void CustomConsoleInit() {
 	videoSetMode(MODE_0_2D);
