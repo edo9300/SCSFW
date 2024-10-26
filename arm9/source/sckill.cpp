@@ -4,36 +4,25 @@
 #include <fat.h>
 #include <stdio.h>
 #include <nds/arm9/console.h>
+#include <utility>
 
 #include "font.h"
 #include "tonccpy.h"
 
-#define SC_MODE_REG 			*(vu16*)0x09FFFFFE
-#define SC_MODE_MAGIC			(u16)0xA55A
-#define SC_MODE_FLASH_RW		(u16)0x4
-#define SC_MODE_FLASH_RW_LITE	(u16)0x1510
+enum class SC_FLASH_COMMAND : u16 {
+	ERASE		= 0x80,
+	ERASE_BLOCK	= 0x30,
+	ERASE_CHIP	= 0x10,
+	PROGRAM		= 0xA0,
+	IDENTIFY	= 0x90,
+};
 
-
-#define SCLITE_FLASH_MAGIC_ADDR_1	(*(vu16*) 0x08000AAA)
-#define SCLITE_FLASH_MAGIC_ADDR_2	(*(vu16*) 0x08000554)
-#define SC_FLASH_MAGIC_ADDR_1	(*(vu16*) 0x08000b92)
-#define SC_FLASH_MAGIC_ADDR_2	(*(vu16*) 0x0800046c)
-#define SC_FLASH_MAGIC_1		((u16) 0xaa)
-#define SC_FLASH_MAGIC_2		((u16) 0x55)
-#define SC_FLASH_ERASE			((u16) 0x80)
-#define SC_FLASH_ERASE_BLOCK	((u16) 0x30)
-#define SC_FLASH_ERASE_CHIP		((u16) 0x10)
-#define SC_FLASH_PROGRAM		((u16) 0xA0)
 #define SC_FLASH_IDLE			((u16) 0xF0)
-#define SC_FLASH_IDENTIFY		((u16) 0x90)
-
-#define FlashBase				0x08000000
-#define MaxFirmSize				0x80000
 
 extern u8 scfw_bin[];
 extern u8 scfw_binEnd[];
 
-u8* scfw_buffer;
+u16* scfw_buffer;
 
 static PrintConsole tpConsole;
 static PrintConsole btConsole;
@@ -46,118 +35,91 @@ static int bgSub;
 
 const char* textBuffer = "X------------------------------X\nX------------------------------X";
 
-volatile u32 cachedFlashID;
-volatile u32 statData = 0x00000000;
-volatile u32 firmSize = 0x80000;
-volatile bool UpdateProgressText = false;
-volatile bool PrintWithStat = true;
-volatile bool ClearOnUpdate = true;
-volatile bool SCLiteMode = false;
-volatile bool FileSuccess = false;
+u32 cachedFlashID;
+u32 statData = 0x00000000;
+u32 firmSize = 0x80000;
+bool UpdateProgressText = false;
+bool PrintWithStat = true;
+bool ClearOnUpdate = true;
+bool SCLiteMode = false;
+bool FileSuccess = false;
 
-
-u32 sc_flash_id() {
-	SC_FLASH_MAGIC_ADDR_1 = SC_FLASH_MAGIC_1;
-	SC_FLASH_MAGIC_ADDR_2 = SC_FLASH_MAGIC_2;
-	SC_FLASH_MAGIC_ADDR_1 = SC_FLASH_IDENTIFY;
-	
-	// should equal 0x000422b9
-	u32 res = SC_FLASH_MAGIC_ADDR_1;
-	res |= *GBA_BUS << 16;
-	
-	*GBA_BUS = SC_FLASH_IDLE;
-	
-	return res;
+static std::pair<vu16*, vu16*> get_magic_addrs(bool isSclite = SCLiteMode) {
+	auto* const SCLITE_FLASH_MAGIC_ADDR_1 = (vu16*)0x08000AAA;
+	auto* const SCLITE_FLASH_MAGIC_ADDR_2 = (vu16*)0x08000554;
+	auto* const SC_FLASH_MAGIC_ADDR_1	 = (vu16*)0x08000b92;
+	auto* const SC_FLASH_MAGIC_ADDR_2	 = (vu16*)0x0800046c;
+	if(isSclite)
+		return { SCLITE_FLASH_MAGIC_ADDR_1, SCLITE_FLASH_MAGIC_ADDR_2 };
+	return { SC_FLASH_MAGIC_ADDR_1, SC_FLASH_MAGIC_ADDR_2 };
 }
 
-void sc_flash_rw_enable() {
-	bool buf = REG_IME;
-	REG_IME = 0;
-	SC_MODE_REG = SC_MODE_MAGIC;
-	SC_MODE_REG = SC_MODE_MAGIC;
-	SC_MODE_REG = SC_MODE_FLASH_RW;
-	SC_MODE_REG = SC_MODE_FLASH_RW;
-	REG_IME = buf;
+static u32 get_max_firm_size(bool isSclite = SCLiteMode) {
+	return isSclite ? 0x7C000 : 0x80000;
 }
 
-void sc_flash_rw_enable_lite() {
-	SC_MODE_REG = SC_MODE_MAGIC;
-	SC_MODE_REG = SC_MODE_MAGIC;
-	SC_MODE_REG = SC_MODE_FLASH_RW_LITE;
-	SC_MODE_REG = SC_MODE_FLASH_RW_LITE;
+static void send_command(SC_FLASH_COMMAND command, bool isSclite = SCLiteMode) {
+	constexpr u16 SC_FLASH_MAGIC_1 = 0x00aa;
+	constexpr u16 SC_FLASH_MAGIC_2 = 0x0055;
+	auto [magic_addr_1, magic_addr_2] = get_magic_addrs(isSclite);
+	*magic_addr_1 = SC_FLASH_MAGIC_1;
+	*magic_addr_2 = SC_FLASH_MAGIC_2;
+	*magic_addr_1 = static_cast<u16>(command);
+}
+
+static void change_mode(u16 mode) {
+	auto* const SC_MODE_REG = (vu16*)0x09FFFFFE;
+	const u16 SC_MODE_MAGIC			= 0xA55A;
+	*SC_MODE_REG = SC_MODE_MAGIC;
+	*SC_MODE_REG = SC_MODE_MAGIC;
+	*SC_MODE_REG = mode;
+	*SC_MODE_REG = mode;
+}
+
+void sc_flash_rw_enable(bool isSclite = SCLiteMode) {
+	constexpr u16 SC_MODE_FLASH_RW		= 0x0004;
+	constexpr u16 SC_MODE_FLASH_RW_LITE	= 0x1510;
+	change_mode(isSclite ? SC_MODE_FLASH_RW_LITE : SC_MODE_FLASH_RW);
+}
+
+bool try_guess_lite(u32* id) {
+	auto get_flash_id = [](bool lite) -> u16 {
+		sc_flash_rw_enable(lite);
+		auto [magic_addr_1, magic_addr_2] = get_magic_addrs(lite);
+		send_command(SC_FLASH_COMMAND::IDENTIFY, lite);
+		auto magic = *magic_addr_1;
+		(void)*GBA_BUS;
+		*GBA_BUS = SC_FLASH_IDLE;		
+		return magic;
+	};
+	auto magic_lite = get_flash_id(true);
+	// known values so far for supercard lite
+	if(magic_lite == 0x22b9) {
+		*id = magic_lite;
+		return true;
+	}
+	
+	auto magic = get_flash_id(false);
+	// known values so far for supercard sd
+	if(magic == 0x22ba) {
+		*id = magic;
+	} else {
+		*id = magic | (((u32)magic_lite) << 16);
+	}
+	
+	return false;
 }
 
 void sc_flash_erase_chip() {
-	bool buf = REG_IME;
-	REG_IME = 0;
-	SC_FLASH_MAGIC_ADDR_1 = SC_FLASH_MAGIC_1;
-	SC_FLASH_MAGIC_ADDR_2 = SC_FLASH_MAGIC_2;
-	SC_FLASH_MAGIC_ADDR_1 = SC_FLASH_ERASE;
-	SC_FLASH_MAGIC_ADDR_1 = SC_FLASH_MAGIC_1;
-	SC_FLASH_MAGIC_ADDR_2 = SC_FLASH_MAGIC_2;
-	SC_FLASH_MAGIC_ADDR_1 = SC_FLASH_ERASE_CHIP;
-	
-	while (*GBA_BUS != *GBA_BUS);
-	*GBA_BUS = SC_FLASH_IDLE;
-	REG_IME = buf;
-}
-
-void sclite_flash_erase_chip() {
-	SCLITE_FLASH_MAGIC_ADDR_1 = SC_FLASH_MAGIC_1;
-	SCLITE_FLASH_MAGIC_ADDR_2 = SC_FLASH_MAGIC_2;
-	SCLITE_FLASH_MAGIC_ADDR_1 = SC_FLASH_ERASE;
-	SCLITE_FLASH_MAGIC_ADDR_1 = SC_FLASH_MAGIC_1;
-	SCLITE_FLASH_MAGIC_ADDR_2 = SC_FLASH_MAGIC_2;
-	SCLITE_FLASH_MAGIC_ADDR_1 = SC_FLASH_ERASE_CHIP;
-	
+	send_command(SC_FLASH_COMMAND::ERASE);
+	send_command(SC_FLASH_COMMAND::ERASE_CHIP);
+		
 	while (*GBA_BUS != *GBA_BUS);
 	*GBA_BUS = SC_FLASH_IDLE;
 }
-
-/*void sc_flash_erase_block(vu16 *addr) {
-	bool buf = REG_IME;
-	REG_IME = 0;
-	SC_FLASH_MAGIC_ADDR_1 = SC_FLASH_MAGIC_1;
-	SC_FLASH_MAGIC_ADDR_2 = SC_FLASH_MAGIC_2;
-	SC_FLASH_MAGIC_ADDR_1 = SC_FLASH_ERASE;
-	SC_FLASH_MAGIC_ADDR_1 = SC_FLASH_MAGIC_1;
-	SC_FLASH_MAGIC_ADDR_2 = SC_FLASH_MAGIC_2;
-	*addr = SC_FLASH_ERASE_BLOCK;
-	
-	// while (*GBA_BUS != *GBA_BUS)swiWaitForVBlank();
-	while (*GBA_BUS != *GBA_BUS);
-	*GBA_BUS = SC_FLASH_IDLE;
-	REG_IME = buf;
-}
-
-void sclite_flash_erase_block(vu16 *addr) {
-	SCLITE_FLASH_MAGIC_ADDR_1 = SC_FLASH_MAGIC_1;
-	SCLITE_FLASH_MAGIC_ADDR_2 = SC_FLASH_MAGIC_2;
-	SCLITE_FLASH_MAGIC_ADDR_1 = SC_FLASH_ERASE;
-	SCLITE_FLASH_MAGIC_ADDR_1 = SC_FLASH_MAGIC_1;
-	SCLITE_FLASH_MAGIC_ADDR_2 = SC_FLASH_MAGIC_2;
-	*addr = SC_FLASH_ERASE_BLOCK;
-	
-	while (*GBA_BUS != *GBA_BUS);
-	*GBA_BUS = SC_FLASH_IDLE;
-}*/
 
 void sc_flash_program(vu16 *addr, u16 val) {
-	bool buf = REG_IME;
-	REG_IME = 0;
-	SC_FLASH_MAGIC_ADDR_1 = SC_FLASH_MAGIC_1;
-	SC_FLASH_MAGIC_ADDR_2 = SC_FLASH_MAGIC_2;
-	SC_FLASH_MAGIC_ADDR_1 = SC_FLASH_PROGRAM;
-	*addr = val;
-	while (*GBA_BUS != *GBA_BUS);
-	*GBA_BUS = SC_FLASH_IDLE;
-	REG_IME = buf;
-}
-
-void sclite_flash_program(vu16 *addr, u16 val) {
-	SCLITE_FLASH_MAGIC_ADDR_1 = SC_FLASH_MAGIC_1;
-	SCLITE_FLASH_MAGIC_ADDR_2 = SC_FLASH_MAGIC_2;
-	SCLITE_FLASH_MAGIC_ADDR_1 = SC_FLASH_PROGRAM;
+	send_command(SC_FLASH_COMMAND::PROGRAM);
 	*addr = val;
 	while (*GBA_BUS != *GBA_BUS);
 	*GBA_BUS = SC_FLASH_IDLE;
@@ -165,52 +127,19 @@ void sclite_flash_program(vu16 *addr, u16 val) {
 
 
 bool DoFlash() {
+	auto* const FLASH_BASE = (vu16*)0x08000000;
 	sc_flash_rw_enable();
 	printf("\n      Death 2 supercard :3\n");
 	printf("      Erasing whole chip\n");
 	sc_flash_erase_chip();
 	printf("      Erased whole chip\n");
 	for (int i = 0; i < 60; i++)swiWaitForVBlank();
-	for (u32 off = 0; off < firmSize; off += 2) {
-		u16 val = 0;
-		val |= scfw_buffer[off];
-		val |= (scfw_buffer[off+1] << 8);
-		sc_flash_program((vu16*)(FlashBase+off), val);
-		if (!UpdateProgressText && !(off & 0x00ff)) {
+	auto total = (firmSize + 1) / 2; // account for odd sizes
+	for (u32 off = 0; off < total; ++off) {
+		sc_flash_program(FLASH_BASE+off, scfw_buffer[off]);
+		if (!UpdateProgressText && !(off & 0x007f)) {
 			textBuffer = "\n\n\n\n\n\n\n\n\n\n\n      Programmed ";
-			statData = (FlashBase+off);
-			UpdateProgressText = true;
-		}
-	}
-	while(UpdateProgressText)swiWaitForVBlank();
-	printf("\n\n\n\n\n      Ded!\n");
-	return false;
-}
-
-bool DoFlash_Lite() {
-	sc_flash_rw_enable_lite();
-	sc_flash_rw_enable_lite();
-	printf("\n    Death 2 supercard lite :3\n");
-	printf("      Erasing whole chip\n");
-	sclite_flash_erase_chip();
-	/*for (u32 addr = 0; addr < 0x80000; addr += 0x2000) {
-		if (!UpdateProgressText) {
-			textBuffer = "\n\n\n\n\n\n\n\n\n\n\n        Erased ";
-			statData = (FlashBase+addr);
-			UpdateProgressText = true;
-		}
-		sclite_flash_erase_block((vu16*)(FlashBase+addr));
-	}*/
-	printf("      Erased whole chip\n");
-	for (int i = 0; i < 60; i++)swiWaitForVBlank();
-	for (u32 off = 0; off < firmSize; off += 2) {
-		u16 val = 0;
-		val |= scfw_buffer[off];
-		val |= (scfw_buffer[off+1] << 8);
-		sclite_flash_program((vu16*)(FlashBase+off), val);
-		if (!UpdateProgressText && !(off & 0x00ff)) {
-			textBuffer = "\n\n\n\n\n\n\n\n\n\n\n      Programmed ";
-			statData = (FlashBase+off);
+			statData = (uintptr_t)(FLASH_BASE+off);
 			UpdateProgressText = true;
 		}
 	}
@@ -245,22 +174,27 @@ void CustomConsoleInit() {
 	consoleSelect(&tpConsole);
 }
 
+void printHeader() {
+	consoleSelect(&tpConsole);
+	if (SCLiteMode) {
+		textBuffer = "\n\n         [SCLITE MODE]\n\n\n\n\n\n\n\n\n        Flash ID ";
+	} else {
+		textBuffer = "\n\n\n\n\n\n\n\n\n\n\n        Flash ID ";
+	}
+	statData = cachedFlashID;
+	UpdateProgressText = true;
+	while(UpdateProgressText)swiWaitForVBlank();
+	statData = 0;
+}
+
 bool Prompt() {
 	while(1) {
 		swiWaitForVBlank();
 		scanKeys();
 		if ((keysDown() & KEY_UP) || (keysDown() & KEY_DOWN) || (keysDown() & KEY_LEFT) || (keysDown() & KEY_RIGHT)) {
-			if (SCLiteMode) { SCLiteMode = false; } else { SCLiteMode = true; }
 			consoleSelect(&tpConsole);
-			if (SCLiteMode) {
-				textBuffer = "\n\n         [SCLITE MODE]\n\n\n\n\n\n\n\n\n        Flash ID ";
-			} else {
-				textBuffer = "\n\n\n\n\n\n\n\n\n\n\n        Flash ID ";
-			}
-			statData = cachedFlashID;
-			UpdateProgressText = true;
-			while(UpdateProgressText)swiWaitForVBlank();
-			statData = 0;
+			SCLiteMode = !SCLiteMode;
+			printHeader();
 			consoleSelect(&btConsole);
 		} else {
 			switch (keysDown()) {
@@ -312,15 +246,11 @@ int main(void) {
 		}
 		return 0;
 	}
-	cachedFlashID = sc_flash_id();
-	textBuffer = "\n\n\n\n\n\n\n\n\n\n\n        Flash ID ";
-	statData = cachedFlashID;
-	UpdateProgressText = true;
-	while(UpdateProgressText)swiWaitForVBlank();
-	statData = 0;
+	SCLiteMode = try_guess_lite(&cachedFlashID);
+	printHeader();
 	
-	firmSize = MaxFirmSize;
-	scfw_buffer = (u8*)malloc(firmSize);
+	firmSize = get_max_firm_size();
+	scfw_buffer = (u16*)malloc(firmSize);
 	toncset(scfw_buffer, 0xFF, firmSize);
 	
 	if (fatInitDefault()) {
@@ -334,7 +264,7 @@ int main(void) {
 			fseek(src, 0, SEEK_END);
 			firmSize = ftell(src);
 			fseek(src, 0, SEEK_SET);
-			if (firmSize <= MaxFirmSize) {
+			if (firmSize <= get_max_firm_size()) {
 				printf("\n\n\n\n\n\n\n\n     [FOUND FIRMWARE.FRM]");
 				consoleSelect(&btConsole);
 				printf("\n Reading FIRMWARE.FRM\n\n Please Wait...");
@@ -354,7 +284,7 @@ int main(void) {
 	
 	if (!FileSuccess) {
 		consoleSelect(&btConsole);
-		toncset(scfw_buffer, 0xFF, MaxFirmSize);
+		toncset(scfw_buffer, 0xFF, get_max_firm_size());
 		tonccpy(scfw_buffer, scfw_bin, (scfw_binEnd - scfw_bin));
 		firmSize = (scfw_binEnd - scfw_bin);
 	}
@@ -366,7 +296,7 @@ int main(void) {
 	
 	consoleClear();
 	
-	if (SCLiteMode) { DoFlash_Lite(); } else { DoFlash(); }	
+	DoFlash();
 	 
 	while(1) {
 		swiWaitForVBlank();
