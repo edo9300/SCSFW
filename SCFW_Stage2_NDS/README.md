@@ -1,1 +1,1 @@
-Hbmenu https://github.com/devkitPro/nds-hb-menu/releases/v0.9.0 dldi patched with [scsd-sdhc-dldi.dldi](https://github.com/ArcheyChen/SuperCard-SDHC-DLDI)
+Hbmenu https://github.com/devkitPro/nds-hb-menu/releases/v0.9.0 dldi patched with [scsd-sdhc-dldi.dldi](https://github.com/edo9300/SuperCard-SDHC-DLDI)
