@@ -83,37 +83,30 @@ void sc_flash_rw_enable(bool isSclite = SCLiteMode) {
 }
 
 bool try_guess_lite(u32* id) {
-	auto get_flash_id = [](bool lite) -> u16 {
+	auto get_flash_id = [](bool lite) -> u32 {
+		static constexpr u16 COMMAND_ERROR = 0x002e;
 		sc_flash_rw_enable(lite);
 		auto [magic_addr_1, magic_addr_2] = get_magic_addrs(lite);
 		send_command(SC_FLASH_COMMAND::IDENTIFY, lite);
+		auto upper_half = *GBA_BUS;
 		auto magic = *magic_addr_1;
-		(void)*GBA_BUS;
-		*GBA_BUS = SC_FLASH_IDLE;		
-		return magic;
+		*GBA_BUS = SC_FLASH_IDLE;
+		if(upper_half == COMMAND_ERROR)
+			return 0;
+		return (upper_half << 16) | magic;
 	};
-	auto magic_lite = get_flash_id(true);
-	// known values so far for supercard lite
-	if(magic_lite == 0x22b9) {
-		*id = magic_lite;
+	if(*id = get_flash_id(true); *id != 0)
 		return true;
-	}
-	
-	auto magic = get_flash_id(false);
-	// known values so far for supercard sd
-	if(magic == 0x22ba) {
-		*id = magic;
-	} else {
-		*id = magic | (((u32)magic_lite) << 16);
-	}
-	
+
+	*id = get_flash_id(false);
+
 	return false;
 }
 
 void sc_flash_erase_chip() {
 	send_command(SC_FLASH_COMMAND::ERASE);
 	send_command(SC_FLASH_COMMAND::ERASE_CHIP);
-		
+
 	while (*GBA_BUS != *GBA_BUS);
 	*GBA_BUS = SC_FLASH_IDLE;
 }
@@ -153,13 +146,13 @@ void CustomConsoleInit() {
 	videoSetModeSub(MODE_0_2D);
 	vramSetBankA (VRAM_A_MAIN_BG);
 	vramSetBankC (VRAM_C_SUB_BG);
-	
+
 	bg = bgInit(3, BgType_Bmp8, BgSize_B8_256x256, 1, 0);
 	bgSub = bgInitSub(3, BgType_Bmp8, BgSize_B8_256x256, 1, 0);
-		
+
 	consoleInit(&btConsole, 3, BgType_Text4bpp, BgSize_T_256x256, 20, 0, false, false);
 	consoleInit(&tpConsole, 3, BgType_Text4bpp, BgSize_T_256x256, 20, 0, true, false);
-		
+
 	ConsoleFont font;
 	font.gfx = (u16*)fontTiles;
 	font.pal = (u16*)fontPal;
@@ -210,11 +203,11 @@ void vBlankHandler (void) {
 	if (UpdateProgressText) {
 		if (!ClearOnUpdate) { ClearOnUpdate = true; } else { consoleClear(); }
 		printf(textBuffer);
-		if (!PrintWithStat) { 
-			PrintWithStat = true; 
-		} else { 
+		if (!PrintWithStat) {
+			PrintWithStat = true;
+		} else {
 			if (FileSuccess && (currentConsole != &btConsole)) {
-				iprintf("%lx \n\n\n\n\n\n\n\n\n     [FOUND FIRMWARE.FRM]", statData); 
+				iprintf("%lx \n\n\n\n\n\n\n\n\n     [FOUND FIRMWARE.FRM]", statData);
 			} else {
 				iprintf("%lx \n", statData);
 			}
@@ -247,12 +240,34 @@ int main(void) {
 		return 0;
 	}
 	SCLiteMode = try_guess_lite(&cachedFlashID);
+	if(cachedFlashID == 0) {
+		textBuffer = "\n\n\n\n\n\n\n\n\n\nThe cart has not been recognized\n\n"
+					 "If you're sure you got a\n"
+					 "supercard\nYou'll have to manually\n"
+					 "pick if it's a supercard lite\n"
+					 "or normal";
+		PrintWithStat = false;
+		UpdateProgressText = true;
+		while(UpdateProgressText)swiWaitForVBlank();
+		consoleSelect(&btConsole);
+		printf("\n Press [A] or [B] to continue.\n");
+		[] {
+			while(1) {
+				swiWaitForVBlank();
+				scanKeys();
+				switch (keysDown()) {
+					case KEY_A: return;
+					case KEY_B: return;
+				}
+			}
+		}();
+	}
 	printHeader();
-	
+
 	firmSize = get_max_firm_size();
 	scfw_buffer = (u16*)malloc(firmSize);
 	toncset(scfw_buffer, 0xFF, firmSize);
-	
+
 	if (fatInitDefault()) {
 		FILE *src = NULL;
 		if (access("/firmware.frm", F_OK) == 0) {
@@ -281,23 +296,23 @@ int main(void) {
 	} else {
 		FileSuccess = false;
 	}
-	
+
 	if (!FileSuccess) {
 		consoleSelect(&btConsole);
 		toncset(scfw_buffer, 0xFF, get_max_firm_size());
 		tonccpy(scfw_buffer, scfw_bin, (scfw_binEnd - scfw_bin));
 		firmSize = (scfw_binEnd - scfw_bin);
 	}
-	
+
 	printf("\n Press [A] to kill supercard.\n");
 	printf(" Press [B] to spare supercard.\n");
-	
+
 	if (!Prompt())return 0;
-	
+
 	consoleClear();
-	
+
 	DoFlash();
-	 
+
 	while(1) {
 		swiWaitForVBlank();
 		scanKeys();
