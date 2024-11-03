@@ -544,6 +544,11 @@ void bwsc_f(char path[], struct bwsc_h *head, const char *out) {
 	}
 }
 
+int ext_length(char *path){
+    char *ext = strrchr(path, '.');
+    return strlen(ext);
+}
+
 void FlashROM(char *path, u32 pathlen, FILE *rom, u32 romsize, bool F_EOL){
 	//Placeholder for now
 	//u32 total_bytes = 0, bytes = 0;
@@ -569,11 +574,11 @@ void FlashROM(char *path, u32 pathlen, FILE *rom, u32 romsize, bool F_EOL){
 		if (settings.autosave) {
 			char savname[PATH_MAX];
 			strcpy(savname, path);
-			strcpy(savname + pathlen - 4, ".sav");
+			strcpy(savname + pathlen - ext_length(path), ".sav");
 			loadSram(savname);
 
 			FILE *lastSaved = fopen("/scfw/lastsaved.txt", "wb");
-			fwrite(savname, pathlen, 1, lastSaved);
+			fwrite(savname, strlen(savname), 1, lastSaved);
 			fclose(lastSaved);
 		}
 
@@ -1729,7 +1734,7 @@ void selectFile(char *path) {
 void change_settings(char *path) {
 	for (int cursor = 0;;) {
 		iprintf("\x1b[2J"
-		        "SCFW Kernel v0.5.2-MPA \nGBA-mode\n\n");
+		        "SCFW Kernel v0.5.2-MPA-hotfix \nGBA-mode\n\n");
 		
 		iprintf("%cAutosave: %i\n", cursor == 0 ? '>' : ' ', settings.autosave);
 		iprintf("%cSRAM Patch: %i\n", cursor == 1 ? '>' : ' ', settings.sram_patch);
@@ -1828,7 +1833,7 @@ int main() {
 
 	consoleDemoInit();
 
-	iprintf("SCFW Kernel v0.5.2-MPA \nGBA-mode\n\n");
+	iprintf("SCFW Kernel v0.5.2-MPA-hotfix \nGBA-mode\n\n");
 	
 	*(vu16*) 0x04000204	 = 0x40c0;
 	if (overclock_ewram())
