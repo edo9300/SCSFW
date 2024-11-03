@@ -53,7 +53,7 @@ For Ebook Advance by Daniel Cotter(txt file reader), the latest version is found
 Once you have those files, transfer these to the scfw folder.
 You should find the ff. within the scfw folder:
 - bwsc.gba
-- drsms.gba
+- drsms.gba (Custom built version by metroid-maniac)
 - gb.gba
 - gbc.gba
 - hvca.gba (Custom built version by metroid-maniac)
