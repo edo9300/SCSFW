@@ -35,20 +35,24 @@ For Home Video Computer Advance, builds require additional work - but after doin
         * _"Like retail games, this emulator tries to increase the ROM speed which supercard is not compatible with, I just disabled that"_ - Metroid Maniac
 
 For SwanGBA, you need to download OR build your preferred SwanGBA fork/binary along with the needed dependencies and rename it to:
-- `bwsc.gba`
+- `bwsc.gba`  
+>[!NOTE]
+> I also build forks so you can also find the latest [SwanGBA binaries here](https://github.com/OmDRetro/SwanGBA-SCFW/releases)
 
 For DrSMS, builds require additional work - but after doing so you can rename the binary to:
 - `drsms.gba`
 
 ## Other applications
 
-For Music Player Advance 2 by NEiM0D, there's only one known version I found and it's found on [archive.org](https://web.archive.org/web/20181020204131/http://www.cellularmobilephones.com/gba_net/MusicPlayer_Advance_2.zip). Simply rename `MPLAYERA.GBA` to `mpa.gba` and gbafix it before placing it inside the scfw folder.
+For Music Player Advance 2 by NEiM0D, there's only one known version I found and it's found on [archive.org](https://web.archive.org/web/20181020204131/http://www.cellularmobilephones.com/gba_net/MusicPlayer_Advance_2.zip). Simply rename `MPLAYERA.GBA` to `mpa.gba` and gbafix it before placing it inside the scfw folder.  
+>![NOTE]
+>You can find a copy of the [MPAC ROM compiling tool here](https://github.com/OmDRetro/MPA2-Compilation-Tools). That repository should have the instructions necessary for you to play some low bitrate beats on your GBA
 
 For Ebook Advance by Daniel Cotter(txt file reader), the latest version is found on [archive.org](https://web.archive.org/web/20070512224717/http://members.optushome.com.au:80/dancotter/ebook.htm). There are two versions here namely:  
 - Ebook Advance - Variable width font **Vertical Version** (ebook03s.zip)
-    - Simply rename `ebook.gba` found in the archive, gbafix it, then rename it to `txt_s.gba` then place it in the scfw folder.
+    - Simply extract `ebook.gba` found in the archive, gbafix it, then rename it to `txt_s.gba` then place it in the scfw folder.
 - Ebook Advance - Variable width font **Horizontal Version** (ebook03.zip)
-    - Simply rename `ebook.gba` found in the archive, gbafix it, then rename it to `txt.gba` then place it in the scfw folder.
+    - Simply extract `ebook.gba` found in the archive, gbafix it, then rename it to `txt.gba` then place it in the scfw folder.
 
 Once you have those files, transfer these to the scfw folder.
 You should find the ff. within the scfw folder:
