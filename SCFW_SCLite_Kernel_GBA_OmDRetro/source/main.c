@@ -117,7 +117,7 @@ struct bwsc_h{
 	u32 id; //BWS",0x1A
 	u32 filesize;
 	u32 flags;			// Bit 1 = PCV2, Bit 2 = WSC, Bit 3 = SwanCrystal.
-	u32 follow;
+	u32 undef;
 	u32 bios;				// Bit 0 = Bios,
 	u32 res0, res1, res2;
 	char name[32];
@@ -504,7 +504,7 @@ char *basename(char *path)
 }
 
 void bwsc_f(char path[], struct bwsc_h *head, const char *out) {
-	head->id = 0x1A534D53; // BWS for BIOS
+	head->id = 0x1A535742; // BWS for BIOS
 	
     FILE *i_file = fopen(path, "rb");
     FILE *o_file = fopen(out, "wb");
@@ -521,7 +521,7 @@ void bwsc_f(char path[], struct bwsc_h *head, const char *out) {
         rewind(i_file);
 		head->flags = 0;
 		iprintf("Analyzing...\n");
-		head->follow = 0;
+		head->undef = 0;
 		head->bios = 0;
 		if (strcasestr(basename(path), "[BIOS]")) {
 			head->bios |= (1 << 0);
@@ -961,7 +961,7 @@ void selectFile(char *path) {
 			}
 			//BIOS FIRST THEN USER CFG ~ BIOS loading not supported atm
 			//
-			head.id = 0x1A534D53; //SMS for games
+			head.id = 0x1A535742; //BWS for games
 			FILE *rom = fopen(path, "rb");
 			fseek(rom, 0, SEEK_END);
 			romsize = ftell(rom);
@@ -975,7 +975,7 @@ void selectFile(char *path) {
 			else
 				head.flags |= (1 << 3);
 			iprintf("Analyzing ROM...\n\n");
-			head.follow = 0;
+			head.undef = 0;
 			head.bios = 0;
 			head.res0 = 0;
 			head.res1 = 0;
@@ -1734,7 +1734,7 @@ void selectFile(char *path) {
 void change_settings(char *path) {
 	for (int cursor = 0;;) {
 		iprintf("\x1b[2J"
-		        "SCFW Kernel v0.5.2-MPA-hotfix \nGBA-mode\n\n");
+		        "SCFW Kernel v0.5.2-WSwan-B \nGBA-mode\n\n");
 		
 		iprintf("%cAutosave: %i\n", cursor == 0 ? '>' : ' ', settings.autosave);
 		iprintf("%cSRAM Patch: %i\n", cursor == 1 ? '>' : ' ', settings.sram_patch);
@@ -1833,7 +1833,7 @@ int main() {
 
 	consoleDemoInit();
 
-	iprintf("SCFW Kernel v0.5.2-MPA-hotfix \nGBA-mode\n\n");
+	iprintf("SCFW Kernel v0.5.2-WSwan-B \nGBA-mode\n\n");
 	
 	*(vu16*) 0x04000204	 = 0x40c0;
 	if (overclock_ewram())
