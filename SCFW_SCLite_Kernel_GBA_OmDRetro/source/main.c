@@ -94,6 +94,7 @@ struct settings {
 	int ngp_bios;
 	int bwsc_bios;
 	int DrSMS_prio;
+	int CoG_prio;
 	int txtmode_s;
 };
 struct settings settings = {
@@ -110,6 +111,7 @@ struct settings settings = {
 	.ngp_bios = 0,
 	.bwsc_bios = 0,
 	.DrSMS_prio = 0,
+	.CoG_prio = 0,
 	.txtmode_s = 0
 };
 
@@ -122,6 +124,11 @@ struct bwsc_h{
 	u32 res0, res1, res2;
 	char name[32];
 };
+
+struct CoG_h {
+	u16 r_size;
+	char pad[9];
+}; //total of 11 bytes
 
 struct hvca_h{
 	long id; //long magic equivalent to HEX 70 41 17 04
@@ -211,6 +218,8 @@ bool filter_game(struct dirent *dirent) {
 	if (dirent->d_type == DT_DIR)
 		return true;
 	u32 namelen = strlen(dirent->d_name);
+	if (namelen > 4 && !strcasecmp(dirent->d_name + namelen - 4, ".col"))
+		return true;
 	if (namelen > 4 && (!strcasecmp(dirent->d_name + namelen - 4, ".fds") || !strcasecmp(dirent->d_name + namelen - 4, ".nsf")))
 		return true;
 	if (namelen > 4 && !strcasecmp(dirent->d_name + namelen - 4, ".gba"))
@@ -247,6 +256,8 @@ bool filter_selectable(struct dirent *dirent) {
 	if (dirent->d_type == DT_DIR)
 		return true;
 	u32 namelen = strlen(dirent->d_name);
+	if (namelen > 4 && !strcasecmp(dirent->d_name + namelen - 4, ".col"))
+		return true;
 	if (namelen > 4 && (!strcasecmp(dirent->d_name + namelen - 4, ".fds") || !strcasecmp(dirent->d_name + namelen - 4, ".nsf")))
 		return true;
 	if (namelen > 4 && !strcasecmp(dirent->d_name + namelen - 4, ".gba"))
@@ -333,7 +344,7 @@ void setLastPlayed(char *path) {
 	}
 	fclose(lastPlayed);
 	*/
-	FILE *lastPlayed = fopen("/scfw/lastplayed.txt", "wb");
+	FILE *lastPlayed = fopen("/scfw/lastplayed.txt", "w+b");
 	fwrite(path, strlen(path), 1, lastPlayed);
 	fclose(lastPlayed);
 }
@@ -366,7 +377,7 @@ void loadSram(char *path) {
 void saveSram(char *path) {
 	sc_mode(SC_MEDIA);
 	iprintf("Saving SRAM to %s\n\n", path);
-	FILE *sav = fopen(path, "wb");
+	FILE *sav = fopen(path, "w+b");
 	if (sav) {
 		for (int i = 0; i < 0x00010000; i += sizeof filebuf) {
 			sc_mode(SC_RAM_RO);
@@ -477,7 +488,7 @@ void hvca_f(char path[], struct hvca_h *head, const char *out) {
 
     FILE *input_file = fopen(path, "rb");
 
-    FILE *o_file = fopen(out, "wb");
+    FILE *o_file = fopen(out, "w+b");
 	
 	if(!input_file) {
 		fclose(input_file);
@@ -507,7 +518,7 @@ void bwsc_f(char path[], struct bwsc_h *head, const char *out) {
 	head->id = 0x1A535742; // BWS for BIOS
 	
     FILE *i_file = fopen(path, "rb");
-    FILE *o_file = fopen(out, "wb");
+    FILE *o_file = fopen(out, "w+b");
 	
 	if(!i_file) {
 		fclose(i_file);
@@ -577,7 +588,7 @@ void FlashROM(char *path, u32 pathlen, FILE *rom, u32 romsize, bool F_EOL){
 			strcpy(savname + pathlen - ext_length(path), ".sav");
 			loadSram(savname);
 
-			FILE *lastSaved = fopen("/scfw/lastsaved.txt", "wb");
+			FILE *lastSaved = fopen("/scfw/lastsaved.txt", "w+b");
 			fwrite(savname, strlen(savname), 1, lastSaved);
 			fclose(lastSaved);
 		}
@@ -608,11 +619,11 @@ void FlashROM(char *path, u32 pathlen, FILE *rom, u32 romsize, bool F_EOL){
 	}
 }
 
-void smsa_f(char path[], struct smsa_h *head, const char *out) {
-	head->id = u32conv("SMS") | (0x1A << 24);
+void smsa_f(char path[], struct smsa_h *head, const char *out, const char *bin_id) {
+	head->id = u32conv(bin_id) | (0x1A << 24);
 
     FILE *i_file = fopen(path, "rb");
-    FILE *o_file = fopen(out, "wb");
+    FILE *o_file = fopen(out, "w+b");
 	
 	if(!i_file) {
 		fclose(i_file);
@@ -654,7 +665,7 @@ void wsv_f(char path[], struct wsv_h *head, const char *out) {
 	head->id = u32conv("VSW") | (0x1A << 24);
 
     FILE *i_file = fopen(path, "rb");
-    FILE *o_file = fopen(out, "wb");
+    FILE *o_file = fopen(out, "w+b");
 	
 	if(!i_file) {
 		fclose(i_file);
@@ -693,7 +704,7 @@ void ngp_f(char path[], struct ngp_h *head, const char *out) {
 	head->id = u32conv("PGN") | (0x1A << 24);
 	
     FILE *i_file = fopen(path, "rb");
-    FILE *o_file = fopen(out, "wb");
+    FILE *o_file = fopen(out, "w+b");
 	
 	if(!i_file) {
 		fclose(i_file);
@@ -750,7 +761,7 @@ void mpa2_f(char path[], struct mpa2_h *head, const char *out){
     FILE *input_file = fopen(path, "rb");
 	fseek(input_file, 0, SEEK_END);
 	head->term1 = ftell(input_file);
-    FILE *o_file = fopen(out, "wb");
+    FILE *o_file = fopen(out, "w+b");
 
 	if(!input_file) {
 		fclose(input_file);
@@ -984,7 +995,7 @@ void selectFile(char *path) {
 			strncpy(bname_b, basename(path), sizeof(bname_b) - 1);
 			bname_b[sizeof(bname_b) - 1] = '\0'; 
 			strcpy(head.name, bname_b);
-			FILE *out_h = fopen("/scfw/bwsc_1.dat", "wb");
+			FILE *out_h = fopen("/scfw/bwsc_1.dat", "w+b");
 			fwrite(&head,1, sizeof head, out_h);
 			fclose(out_h);
 			out_h = fopen("/scfw/bwsc_1.dat", "rb");
@@ -1062,7 +1073,7 @@ void selectFile(char *path) {
 			//Third file
 			if(!strcasecmp(path + pathlen - 4, ".nsf"))
 				strcpy(hvca_deps,"/scfw/hvca/mapr/mnsf.bin");
-			else
+			if(!strcasecmp(path + pathlen - 4, ".fds"))
 				strcpy(hvca_deps,"/scfw/hvca/mapr/mfds.bin");
 			output_path = "/scfw/hvca/hvca_2.dat";
 			hvca_f(hvca_deps, &head, output_path);
@@ -1075,7 +1086,7 @@ void selectFile(char *path) {
 			FILE *out_f5;
 			if(!strcasecmp(path + pathlen - 4, ".nsf"))
 				out_f5 = fopen("/scfw/hvca/mapr/mnsf.bin", "rb");
-			else
+			if(!strcasecmp(path + pathlen - 4, ".fds"))
 				out_f5 = fopen("/scfw/hvca/mapr/mfds.bin", "rb");
 			fseek(out_f5, 0, SEEK_END);
 			romsize = ftell(out_f5);
@@ -1123,7 +1134,7 @@ void selectFile(char *path) {
 			head0.filename[0] = 0;
 			head0.ext[0] = 0;
 			head0.filesize = 0;
-			FILE *out_f9 = fopen("/scfw/hvca/hvca_5.dat", "wb");
+			FILE *out_f9 = fopen("/scfw/hvca/hvca_5.dat", "w+b");
 			fwrite(&head0,1, sizeof head0, out_f9);
 			fclose(out_f9);
 			out_f9 = fopen("/scfw/hvca/hvca_5.dat", "rb");
@@ -1215,7 +1226,7 @@ void selectFile(char *path) {
 			}
 			header.follow = 0;
 			header.reserved = 0;
-			FILE *out_h = fopen("/scfw/pnes_h.dat", "wb");
+			FILE *out_h = fopen("/scfw/pnes_h.dat", "w+b");
 			fwrite(&header,1, sizeof header, out_h);
 			fclose(out_h);
 			out_h = fopen("/scfw/pnes_h.dat", "rb");
@@ -1283,7 +1294,7 @@ void selectFile(char *path) {
 			for (int i = 1; i < 12; ++i) {
 				header.unk[i] = ' ';
 			}
-			FILE *out_h = fopen("/scfw/pcea_h.dat", "wb");
+			FILE *out_h = fopen("/scfw/pcea_h.dat", "w+b");
 			fwrite(&header,1, sizeof header, out_h);
 			fclose(out_h);
 			out_h = fopen("/scfw/pcea_h.dat", "rb");
@@ -1332,7 +1343,7 @@ void selectFile(char *path) {
 					strcpy(smsa_deps,"/scfw/[BIOS]smsa_gg.rom");
 				output_path = "/scfw/smsa_0.dat";
 				iprintf("... PLEASE WAIT ...\n\n");
-				smsa_f(smsa_deps, &head, output_path);
+				smsa_f(smsa_deps, &head, output_path, "SMS");
 				out_f0 = fopen(output_path, "rb");
 				fseek(out_f0,0,SEEK_END);
 				romsize = ftell(out_f0);
@@ -1384,7 +1395,7 @@ void selectFile(char *path) {
 			strncpy(bname_b, basename(path), sizeof(bname_b) - 1);
 			bname_b[sizeof(bname_b) - 1] = '\0'; 
 			strcpy(head.name, bname_b);
-			FILE *out_h = fopen("/scfw/smsa_1.dat", "wb");
+			FILE *out_h = fopen("/scfw/smsa_1.dat", "w+b");
 			fwrite(&head,1, sizeof head, out_h);
 			fclose(out_h);
 			out_h = fopen("/scfw/smsa_1.dat", "rb");
@@ -1469,7 +1480,7 @@ void selectFile(char *path) {
 			strncpy(bname_b, basename(path), sizeof(bname_b) - 1);
 			bname_b[sizeof(bname_b) - 1] = '\0'; 
 			strcpy(head.name, bname_b);
-			FILE *out_h = fopen("/scfw/drsms_0.dat", "wb");
+			FILE *out_h = fopen("/scfw/drsms_0.dat", "w+b");
 			fwrite(&head,1, sizeof head, out_h);
 			fclose(out_h);
 			out_h = fopen("/scfw/drsms_0.dat", "rb");
@@ -1544,7 +1555,7 @@ void selectFile(char *path) {
 			strncpy(bname_b, basename(path), sizeof(bname_b) - 1);
 			bname_b[sizeof(bname_b) - 1] = '\0'; 
 			strcpy(head.name, bname_b);
-			FILE *out_f2 = fopen("/scfw/wsv_1.dat", "wb");
+			FILE *out_f2 = fopen("/scfw/wsv_1.dat", "w+b");
 			fwrite(&head,1, sizeof head, out_f2);
 			fclose(out_f2);
 			out_f2 = fopen("/scfw/wsv_1.dat", "rb");
@@ -1631,7 +1642,7 @@ void selectFile(char *path) {
 			strncpy(bname_b, basename(path), sizeof(bname_b) - 1);
 			bname_b[sizeof(bname_b) - 1] = '\0'; 
 			strcpy(head.name, bname_b);
-			FILE *out_h = fopen("/scfw/ngpgba_1.dat", "wb");
+			FILE *out_h = fopen("/scfw/ngpgba_1.dat", "w+b");
 			fwrite(&head,1, sizeof head, out_h);
 			fclose(out_h);
 			out_h = fopen("/scfw/ngpgba_1.dat", "rb");
@@ -1726,6 +1737,137 @@ void selectFile(char *path) {
 			fclose(mpa);
 			L_Seq(path);
 		}
+	} else if (pathlen > 4 && (!strcasecmp(path + pathlen - 4, ".col") && settings.CoG_prio)){
+		u32 romsize = 0;
+		total_bytes = 0,bytes = 0;
+		const char *emu_bin = "/scfw/cog.gba";
+		FILE *emu = fopen(emu_bin, "rb");
+		if (!emu) {
+			iprintf("Checking %s\n",emu_bin);
+			u_prompt("CoG not found!\n\n");
+			fclose(emu);
+		} else {
+			fseek(emu,0,SEEK_END);
+			romsize = ftell(emu);
+			romSize = romsize;
+			fseek(emu, 0, SEEK_SET);
+			iprintf("Loading CoG\n\n");
+			FlashROM(path,pathlen,emu,romSize,false);
+			struct CoG_h header;
+			header.pad[0] = 0;
+			FILE *rom = fopen(path, "rb");
+			fseek(rom, 0, SEEK_END);
+			romsize = ftell(rom);
+			header.r_size = 0;
+			header.r_size = romsize;
+			iprintf("Analyzing ROM...\n\n");
+			FILE *out_h = fopen("/scfw/cog_h.dat", "w+b");
+			fwrite(&header,1, sizeof header, out_h);
+			fclose(out_h);
+			out_h = fopen("/scfw/cog_h.dat", "rb");
+			fseek(out_h,0,SEEK_END);
+			romsize = ftell(out_h);
+			romSize += romsize;
+			fseek(out_h, 0, SEEK_SET);
+			FlashROM(path,pathlen,out_h,romSize,false);
+			fseek(rom, 0, SEEK_END);
+			romsize = ftell(rom);
+			romSize += romsize;
+			fseek(rom, 0, SEEK_SET);
+			iprintf("Loading ROM:\n\n");
+			FlashROM(path,pathlen,rom,romSize,true);
+			fclose(rom);
+			fclose(out_h);
+			fclose(emu);
+			L_Seq(path);
+		}
+	} else if (pathlen > 4 && (!strcasecmp(path + pathlen - 4, ".col") && !settings.CoG_prio)){
+		u32 romsize = 0;
+		total_bytes = 0,bytes = 0;
+		const char *emu_bin = "/scfw/cologne.gba";
+		FILE *emu = fopen(emu_bin, "rb");
+		if (!emu) {
+			iprintf("Checking %s\n",emu_bin);
+			u_prompt("No Cologne found!\n\n");
+			fclose(emu);
+		} else {
+			fseek(emu,0,SEEK_END);
+			romsize = ftell(emu);
+			romSize = romsize;
+			fseek(emu, 0, SEEK_SET);
+			iprintf("Loading Cologne\n\n");
+			FlashROM(path,pathlen,emu,romSize,false);
+			struct smsa_h head;
+			char cologne_deps[64];
+			strcpy(cologne_deps,"/scfw/[BIOS].col");
+			const char *output_path;
+			output_path = "/scfw/col_0.dat";
+			iprintf("... PLEASE WAIT ...\n\n");
+			FILE *out_f0, *out_f1;
+			if (!settings.CoG_prio) {
+				smsa_f(cologne_deps, &head, output_path, "LOC");
+				out_f0 = fopen(output_path, "rb");
+				fseek(out_f0,0,SEEK_END);
+				romsize = ftell(out_f0);
+				romSize += romsize;
+				fseek(out_f0, 0, SEEK_SET);
+				FlashROM(path,pathlen,out_f0,romSize,false);
+				out_f1 = fopen(cologne_deps, "rb");
+				fseek(out_f1, 0, SEEK_END);
+				romsize = ftell(out_f1);
+				romSize += romsize;
+				fseek(out_f1, 0, SEEK_SET);
+				iprintf("Loading Cologne BIOS:\n\n");
+				FlashROM(path,pathlen,out_f1,romSize,false);
+			}
+			//Flash COL ROM
+			head.id = u32conv("LOC") | (0x1A << 24);
+			FILE *rom = fopen(path, "rb");
+			fseek(rom, 0, SEEK_END);
+			romsize = ftell(rom);
+			head.filesize = 0;
+			head.filesize = romsize;
+			head.flags = 0;
+			iprintf("Analyzing ROM...\n\n");
+			if (strcasestr(basename(path), "(E)") || strcasestr(basename(path), "(EUR)") || strcasestr(basename(path), "(Europe)")) {
+				head.flags |= (1 << 0);
+				iprintf("PAL timing\n\n");
+			} else {
+				head.flags |= (0 << 0);
+				iprintf("NTSC timing\n\n");
+			}
+			head.hacks = 0;
+			head.follow = 0;
+			head.B_flag = 0;
+			head.res0 = 0;
+			head.res1 = 0;
+			head.res2 = 0;
+			char bname_b[32];
+			strncpy(bname_b, basename(path), sizeof(bname_b) - 1);
+			bname_b[sizeof(bname_b) - 1] = '\0'; 
+			strcpy(head.name, bname_b);
+			FILE *out_h = fopen("/scfw/col_1.dat", "wb");
+			fwrite(&head,1, sizeof head, out_h);
+			fclose(out_h);
+			out_h = fopen("/scfw/col_1.dat", "rb");
+			fseek(out_h,0,SEEK_END);
+			romsize = ftell(out_h);
+			romSize += romsize;
+			fseek(out_h, 0, SEEK_SET);
+			FlashROM(path,pathlen,out_h,romSize,false);
+			fseek(rom, 0, SEEK_END);
+			romsize = ftell(rom);
+			romSize += romsize;
+			fseek(rom, 0, SEEK_SET);
+			iprintf("Loading ROM:\n\n");
+			FlashROM(path,pathlen,rom,romSize,true);
+			fclose(rom);
+			fclose(out_h);
+			fclose(out_f1);
+			fclose(out_f0);
+			fclose(emu);
+			L_Seq(path);
+		}
 	} else {
 		u_prompt("Unrecognised file extension!\n");
 	}
@@ -1734,7 +1876,7 @@ void selectFile(char *path) {
 void change_settings(char *path) {
 	for (int cursor = 0;;) {
 		iprintf("\x1b[2J"
-		        "SCFW Kernel v0.5.2-WSwan-B \nGBA-mode\n\n");
+		        "SCFW Kernel v0.5.2-Coleco \nGBA-mode\n\n");
 		
 		iprintf("%cAutosave: %i\n", cursor == 0 ? '>' : ' ', settings.autosave);
 		iprintf("%cSRAM Patch: %i\n", cursor == 1 ? '>' : ' ', settings.sram_patch);
@@ -1743,11 +1885,12 @@ void change_settings(char *path) {
 		iprintf("%cBoot games through BIOS: %i\n", cursor == 4 ? '>' : ' ', settings.biosboot);
 		iprintf("%cAutosave after cold boot: %i\n", cursor == 5 ? '>' : ' ', settings.cold_boot_save);
 		iprintf("%cDrSMS over SMSAdvance: %i\n", cursor == 6 ? '>' : ' ', settings.DrSMS_prio);
-		iprintf("%cRead txt files sideways: %i\n", cursor == 7 ? '>' : ' ', settings.txtmode_s);
-		iprintf("%c[SMSAdvance] Load BIOS: %i\n", cursor == 8 ? '>' : ' ', settings.smsa_bios);
-		iprintf("%c[WasabiGBA] Load BIOS: %i\n", cursor == 9 ? '>' : ' ', settings.wsv_bios);
-		iprintf("%c[NGPGBA] Load BIOS: %i\n", cursor == 10 ? '>' : ' ', settings.ngp_bios);
-		iprintf("%c[SwanGBA] Load BIOS: %i\n", cursor == 11 ? '>' : ' ', settings.bwsc_bios);
+		iprintf("%cCoG over Cologne: %i\n", cursor == 7 ? '>' : ' ', settings.CoG_prio);
+		iprintf("%cRead txt files sideways: %i\n", cursor == 8 ? '>' : ' ', settings.txtmode_s);
+		iprintf("%c[SMSAdvance] Load BIOS: %i\n", cursor == 9 ? '>' : ' ', settings.smsa_bios);
+		iprintf("%c[WasabiGBA] Load BIOS: %i\n", cursor == 10 ? '>' : ' ', settings.wsv_bios);
+		iprintf("%c[NGPGBA] Load BIOS: %i\n", cursor == 11 ? '>' : ' ', settings.ngp_bios);
+		iprintf("%c[SwanGBA] Load BIOS: %i\n", cursor == 12 ? '>' : ' ', settings.bwsc_bios);
 		
 		do {
 			scanKeys();
@@ -1779,18 +1922,21 @@ void change_settings(char *path) {
 				settings.DrSMS_prio = !settings.DrSMS_prio;
 				break;
 			case 7:
-				settings.txtmode_s = !settings.txtmode_s;
+				settings.CoG_prio = !settings.CoG_prio;
 				break;
 			case 8:
-				settings.smsa_bios = !settings.smsa_bios;
+				settings.txtmode_s = !settings.txtmode_s;
 				break;
 			case 9:
-				settings.wsv_bios = !settings.wsv_bios;
+				settings.smsa_bios = !settings.smsa_bios;
 				break;
 			case 10:
-				settings.ngp_bios = !settings.ngp_bios;
+				settings.wsv_bios = !settings.wsv_bios;
 				break;
 			case 11:
+				settings.ngp_bios = !settings.ngp_bios;
+				break;
+			case 12:
 				settings.bwsc_bios = !settings.bwsc_bios;
 				break;
 			}
@@ -1801,17 +1947,17 @@ void change_settings(char *path) {
 		if (pressed & KEY_UP) {
 			--cursor;
 			if (cursor < 0)
-				cursor += 12;
+				cursor += 13;
 		}
 		if (pressed & KEY_DOWN) {
 			++cursor;
-			if (cursor > 11)
-				cursor -= 12;
+			if (cursor > 12)
+				cursor -= 13;
 		}
 	}
 	
 	iprintf("Saving settings...\n");
-	FILE *settings_file = fopen("/scfw/settings.bin", "wb");
+	FILE *settings_file = fopen("/scfw/settings.bin", "w+b");
 	if (settings_file) {
 		fwrite(&settings, 1, sizeof settings, settings_file);
 		fclose(settings_file);
@@ -1833,7 +1979,7 @@ int main() {
 
 	consoleDemoInit();
 
-	iprintf("SCFW Kernel v0.5.2-WSwan-B \nGBA-mode\n\n");
+	iprintf("SCFW Kernel v0.5.2-Coleco \nGBA-mode\n\n");
 	
 	*(vu16*) 0x04000204	 = 0x40c0;
 	if (overclock_ewram())
@@ -1857,7 +2003,7 @@ int main() {
 			iprintf("Reading settings\n");
 			if (fread(&settings, 1, sizeof settings, settings_file) != sizeof settings) {
 					iprintf("Appending new defaults\n");
-					freopen("", "wb", settings_file);
+					freopen("", "w+b", settings_file);
 					fwrite(&settings, 1, sizeof settings, settings_file);
 			}
 			fclose(settings_file);
