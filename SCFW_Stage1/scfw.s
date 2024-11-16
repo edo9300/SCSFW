@@ -78,43 +78,10 @@ load_gba_loop:
 	bx lr
 # load & execute nds rom
 nds_code:
-#libnds crt clears those important values from the header, back them up to an unused
-#area of the header to then be retrieved manually later
-	mov r0, # 0x02800000
-	sub r0, r0, # 0x200
-	add r1, r0, #0x80
-	add r2, r0, #0x88
-	add r3, r0, #0x94
-backup_header_contents_loop:
-	ldr r4, [r1], # 4
-	str r4, [r3], # 4
-	cmp r1, r2
-	blt backup_header_contents_loop
-
-	#check if the secure area was loaded at 0x02000000
-	mov r0, # 0x02000000
-	ldr r1, [r0]
-	cmp r1, # 0
-	#something nonzero was found here, assume it's the arm9 binary
-	bne load_nds_binaries
-
-	#secure area contents not found, could be at 0x02004000
-	add r1, r0, # 0x4000
-	ldr r2, [r1]
-	cmp r2, # 0
-	#no secure area binaries, just load target rom
-	beq load_nds_binaries
+#the ds firmware stores the decrypted secure area of games at either 0x02000000 or 0x02004000
+#don't touch that memory region
 	mov r2, # 0x02000000
-	add r3, r1, # 0x4000
-move_secure_area_loop:
-	ldr r4, [r1], # 4
-	str r4, [r2], # 4
-	cmp r1, r3
-	blt move_secure_area_loop
-
-load_nds_binaries:
-	mov r2, # 0x02000000
-	add r2, r2, # 0x8000
+	add r2, r2, $supercard_switch_mode_offset
 	mov r4, r2
 	adrl r0, miniboot_arm9
 	adrl r1, miniboot_arm9_end

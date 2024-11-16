@@ -10,7 +10,7 @@
 #include "console.h"
 #include "scsd/sc_commands.h"
 
-// #define DEBUG
+#define DEBUG
 
 #define DLDI_BACKUP   ((DLDI_INTERFACE*) 0x6820000)
 #define checkErrorFatFs(...) do {(void)0; } while(0)
@@ -63,6 +63,33 @@ void readNds(void* dest, unsigned int offset, unsigned int size) {
 	__aeabi_memcpy(dest, (void*)&GBA_BUS_U8[parameters.nds_rom + offset], size);
 }
 
+#define SECURE_AREA_FROM_FW (*((volatile uint32_t*)0x2000000))
+#define SECURE_AREA_FROM_FW_2 (*((volatile uint32_t*)0x2004000))
+
+static void backupDecryptedHeaderAndSecureAreaAndHeaderToSCRam(void) {
+	volatile uint32_t* secure_area_ptr = 0;
+	
+	if(SECURE_AREA_FROM_FW != 0) {
+		secure_area_ptr = &SECURE_AREA_FROM_FW;
+	} else if(SECURE_AREA_FROM_FW_2 != 0) {
+		secure_area_ptr = &SECURE_AREA_FROM_FW_2;
+	}
+	if(secure_area_ptr == 0)
+		return;
+	dprintf("Fround secure area at address: 0x%X\n", (intptr_t)secure_area_ptr);
+	char str_buff[13];
+	__aeabi_memcpy(str_buff, NDS_HEADER->game_title, 12);
+	str_buff[13] = 0;
+	dprintf("Loaded game is: %s\n", str_buff);
+	__aeabi_memcpy(str_buff, NDS_HEADER->game_code, 4);
+	str_buff[5] = 0;
+	dprintf("Loaded game code is: %s\n", str_buff);
+	sc_change_mode(0x5);
+	__aeabi_memcpy4(GBA_BUS, NDS_HEADER, 0x200);
+	__aeabi_memcpy4((GBA_BUS_U8 + 0x200), secure_area_ptr, 0x4000);
+	sc_change_mode(en_write);
+}
+
 int main(void) {
     unsigned int bytes_read;
     int result;
@@ -106,6 +133,8 @@ int main(void) {
         ipc_arm7_cmd((i << 8) & 0xF00);
     }
     dprintf(" OK\n");
+
+	backupDecryptedHeaderAndSecureAreaAndHeaderToSCRam();
 
     // Create a bootstub in memory, if one doesn't already exist.
     if (DKA_BOOTSTUB->magic != DKA_BOOTSTUB_MAGIC) {
