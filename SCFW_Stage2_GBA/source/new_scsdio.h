@@ -2,11 +2,14 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
-#ifdef NDS
- #include <nds/ndstypes.h>
-#else
- #include "gba_types.h"
-#endif
+#include <stdint.h>
+#include <stdbool.h>
+
+typedef uint8_t u8;
+typedef uint16_t u16;
+typedef volatile uint16_t vu16;
+typedef uint32_t u32;
+typedef volatile uint32_t vu32;
 
 #define sd_comadd 0x9800000
 #define sd_dataadd 0x9000000  

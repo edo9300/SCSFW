@@ -7,3 +7,4 @@
 data/*.bin
 .vscode
 *.DS_Store
+compile_commands.json

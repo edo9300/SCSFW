@@ -1,137 +1,147 @@
-#---------------------------------------------------------------------------------
-# Clear the implicit built in rules
-#---------------------------------------------------------------------------------
-.SUFFIXES:
-#---------------------------------------------------------------------------------
-ifeq ($(strip $(DEVKITARM)),)
-$(error "Please set DEVKITARM in your environment. export DEVKITARM=<path to>devkitARM)
-endif
+# SPDX-License-Identifier: CC0-1.0
+#
+# SPDX-FileContributor: Adrian "asie" Siekierka, 2023
 
-include $(DEVKITARM)/gba_rules
+export WONDERFUL_TOOLCHAIN ?= /opt/wonderful
+TARGET = gba/multiboot
+include $(WONDERFUL_TOOLCHAIN)/target/$(TARGET)/makedefs.mk
+CXX		:= $(WONDERFUL_TOOLCHAIN)/toolchain/gcc-arm-none-eabi/bin/arm-none-eabi-g++
 
-#---------------------------------------------------------------------------------
-# TARGET is the name of the output, if this ends with _mb a multiboot image is generated
-# BUILD is the directory where object files & intermediate files will be placed
-# SOURCES is a list of directories containing source code
-# DATA is a list of directories containing data files
-# INCLUDES is a list of directories containing header files
-#---------------------------------------------------------------------------------
-TARGET		:=	$(shell basename $(CURDIR))_mb
-BUILD		:=	build
-SOURCES		:=	source source/fatfs
-DATA		:=	
-INCLUDES	:=
+# Metadata
+# --------
 
-#---------------------------------------------------------------------------------
-# options for code generation
-#---------------------------------------------------------------------------------
-ARCH	:=	-mthumb -mthumb-interwork
+NAME		:= $(shell basename $(CURDIR))_mb
 
-CFLAGS	:=	-g -Wall -Os \
-		-mcpu=arm7tdmi -mtune=arm7tdmi\
-		$(ARCH)
+# Source code paths
+# -----------------
 
-CFLAGS	+=	$(INCLUDE)
+INCLUDEDIRS	:= include
+SOURCEDIRS	:= source
+ASSETDIRS	:= assets
+CBINDIRS	:= cbin
 
-CXXFLAGS	:=	$(CFLAGS) -fno-rtti -fno-exceptions
+# Defines passed to all files
+# ---------------------------
 
-CFLAGS +=  -std=gnu99
+DEFINES		:=
 
-ASFLAGS	:=	$(ARCH)
-LDFLAGS	=	-g $(ARCH) -Wl,-Map,$(notdir $@).map
+# Libraries
+# ---------
 
-#---------------------------------------------------------------------------------
-# path to tools - this can be deleted if you set the path to the toolchain in windows
-#---------------------------------------------------------------------------------
-export PATH	:=	$(DEVKITARM)/bin:$(PATH)
+LIBS		:=
+LIBDIRS		:=
 
-#---------------------------------------------------------------------------------
-# any extra libraries we wish to link with the project
-#---------------------------------------------------------------------------------
-LIBS	:=	-lgba
+# Build artifacts
+# ---------------
 
-#---------------------------------------------------------------------------------
-# list of directories containing libraries, this must be the top level containing
-# include and lib
-#---------------------------------------------------------------------------------
-LIBDIRS	:=	$(LIBGBA)
+BUILDDIR	:= build
+ELF		:= build/$(NAME).elf
+MAP		:= build/$(NAME).map
+ROM		:= $(NAME).gba
 
-#---------------------------------------------------------------------------------
-# no real need to edit anything past this point unless you need to add additional
-# rules for different file extensions
-#---------------------------------------------------------------------------------
-ifneq ($(BUILD),$(notdir $(CURDIR)))
-#---------------------------------------------------------------------------------
+# Verbose flag
+# ------------
 
-export OUTPUT	:=	$(CURDIR)/$(TARGET)
-export VPATH	:=	$(foreach dir,$(SOURCES),$(CURDIR)/$(dir)) \
-			$(foreach dir,$(DATA),$(CURDIR)/$(dir))
-
-export DEPSDIR	:=	$(CURDIR)/$(BUILD)
-
-#---------------------------------------------------------------------------------
-# automatically build a list of object files for our project
-#---------------------------------------------------------------------------------
-CFILES		:=	$(foreach dir,$(SOURCES),$(notdir $(wildcard $(dir)/*.c)))
-CPPFILES	:=	$(foreach dir,$(SOURCES),$(notdir $(wildcard $(dir)/*.cpp)))
-SFILES		:=	$(foreach dir,$(SOURCES),$(notdir $(wildcard $(dir)/*.s)))
-BINFILES	:=	$(foreach dir,$(DATA),$(notdir $(wildcard $(dir)/*.*)))
-
-#---------------------------------------------------------------------------------
-# use CXX for linking C++ projects, CC for standard C
-#---------------------------------------------------------------------------------
-ifeq ($(strip $(CPPFILES)),)
-#---------------------------------------------------------------------------------
-	export LD	:=	$(CC)
-#---------------------------------------------------------------------------------
+ifeq ($(V),1)
+_V		:=
 else
-#---------------------------------------------------------------------------------
-	export LD	:=	$(CXX)
-#---------------------------------------------------------------------------------
+_V		:= @
 endif
-#---------------------------------------------------------------------------------
 
-export OFILES	:= $(addsuffix .o,$(BINFILES)) $(CPPFILES:.cpp=.o) $(CFILES:.c=.o) $(SFILES:.s=.o)
+# Source files
+# ------------
 
-#---------------------------------------------------------------------------------
-# build a list of include paths
-#---------------------------------------------------------------------------------
-export INCLUDE	:=	$(foreach dir,$(INCLUDES),-I$(CURDIR)/$(dir)) \
-			$(foreach dir,$(LIBDIRS),-I$(dir)/include) \
-			-I$(CURDIR)/$(BUILD)
+SOURCES_S	:= $(shell find -L $(SOURCEDIRS) -name "*.s")
+SOURCES_C	:= $(shell find -L $(SOURCEDIRS) -name "*.c")
+SOURCES_CXX	:= $(shell find -L $(SOURCEDIRS) -name "*.cpp")
 
-#---------------------------------------------------------------------------------
-# build a list of library paths
-#---------------------------------------------------------------------------------
-export LIBPATHS	:=	$(foreach dir,$(LIBDIRS),-L$(dir)/lib)
+# Compiler and linker flags
+# -------------------------
 
-.PHONY: $(BUILD) clean
+WARNFLAGS	:= -Wall
 
-#---------------------------------------------------------------------------------
-$(BUILD):
-	@[ -d $@ ] || mkdir -p $@
-	@make --no-print-directory -C $(BUILD) -f $(CURDIR)/Makefile
+INCLUDEFLAGS	:= $(foreach path,$(INCLUDEDIRS),-I$(path)) \
+		   $(foreach path,$(LIBDIRS),-isystem $(path)/include)
 
-all	: $(BUILD)
-#---------------------------------------------------------------------------------
+LIBDIRSFLAGS	:= $(foreach path,$(LIBDIRS),-L$(path)/lib)
+
+ASFLAGS		+= -x assembler-with-cpp $(DEFINES) $(WF_ARCH_CFLAGS) \
+		   $(INCLUDEFLAGS) -ffunction-sections -fdata-sections
+
+CFLAGS		+= -std=gnu2x $(WARNFLAGS) $(DEFINES) $(WF_ARCH_CFLAGS) \
+		   $(INCLUDEFLAGS) -ffunction-sections -fdata-sections -mthumb -Os
+
+#workaround, only the scsd driver requires arm, due to inline asm, so force it as such
+
+CXXFLAGS	+= $(WARNFLAGS) $(DEFINES) $(WF_ARCH_CFLAGS) \
+		   $(INCLUDEFLAGS) -ffunction-sections -fdata-sections -fno-rtti -fno-exceptions -marm -Os
+
+LDFLAGS		:= $(LIBDIRSFLAGS) $(DEFINES) -Wl,-Map,$(MAP) -Wl,--gc-sections \
+		   $(WF_ARCH_LDFLAGS) $(LIBS)
+
+BUILDROMFLAGS	:=
+
+# Intermediate build files
+# ------------------------
+
+OBJS_SOURCES	:= $(addsuffix .o,$(addprefix $(BUILDDIR)/,$(SOURCES_S))) \
+		   $(addsuffix .o,$(addprefix $(BUILDDIR)/,$(SOURCES_C))) \
+		   $(addsuffix .o,$(addprefix $(BUILDDIR)/,$(SOURCES_CXX)))
+
+OBJS		:= $(OBJS_SOURCES)
+
+DEPS		:= $(OBJS:.o=.d)
+
+# Targets
+# -------
+
+.PHONY: all clean
+
+all: $(ROM) compile_commands.json
+
+$(ROM) $(ELF): $(OBJS)
+	@echo "  ROM     $@"
+	$(_V)$(ROMLINK) -o $(ROM) --output-elf $(ELF) $(ROMLINKFLAGS) -- $(OBJS) $(LDFLAGS)
+
 clean:
-	@echo clean ...
-	@rm -fr $(BUILD) $(TARGET).elf $(TARGET).gba
+	@echo "  CLEAN"
+	$(_V)$(RM) $(ELF) $(ROM) $(BUILDDIR) compile_commands.json
 
-#---------------------------------------------------------------------------------
-else
+compile_commands.json: $(OBJS) | Makefile
+	@echo "  MERGE   compile_commands.json"
+	$(_V)$(WF)/bin/wf-compile-commands-merge $@ $(patsubst %.o,%.cc.json,$^)
 
-DEPENDS	:=	$(OFILES:.o=.d)
+# Rules
+# -----
 
-#---------------------------------------------------------------------------------
-# main targets
-#---------------------------------------------------------------------------------
-$(OUTPUT).gba	:	$(OUTPUT).elf
+$(BUILDDIR)/%.s.o : %.s | $(OBJS_ASSETS)
+	@echo "  AS      $<"
+	@$(MKDIR) -p $(@D)
+	$(_V)$(CC) $(ASFLAGS) -MMD -MP -MJ $(patsubst %.o,%.cc.json,$@) -c -o $@ $<
 
-$(OUTPUT).elf	:	$(OFILES)
+$(BUILDDIR)/%.c.o : %.c | $(OBJS_ASSETS)
+	@echo "  CC      $<"
+	@$(MKDIR) -p $(@D)
+	$(_V)$(CC) $(CFLAGS) -MMD -MP -MJ $(patsubst %.o,%.cc.json,$@) -c -o $@ $<
 
--include $(DEPENDS)
+$(BUILDDIR)/%.cpp.o : %.cpp | $(OBJS_ASSETS)
+	@echo "  CXX      $<"
+	@$(MKDIR) -p $(@D)
+	$(_V)$(CXX) $(CXXFLAGS) -MMD -MP -MJ $(patsubst %.o,%.cc.json,$@) -c -o $@ $<
 
-#---------------------------------------------------------------------------------
-endif
-#---------------------------------------------------------------------------------
+$(BUILDDIR)/%.bin.o $(BUILDDIR)/%_bin.h : %.bin
+	@echo "  BIN2C   $<"
+	@$(MKDIR) -p $(@D)
+	$(_V)$(WF)/bin/wf-bin2c -a 4 $(@D) $<
+	$(_V)$(CC) $(CFLAGS) -MMD -MP -c -o $(BUILDDIR)/$*.bin.o $(BUILDDIR)/$*_bin.c
+
+$(BUILDDIR)/%.lua.o : %.lua
+	@echo "  PROCESS $<"
+	@$(MKDIR) -p $(@D)
+	$(_V)$(WF)/bin/wf-process -o $(BUILDDIR)/$*.c -t $(TARGET) --depfile $(BUILDDIR)/$*.lua.d --depfile-target $(BUILDDIR)/$*.lua.o $<
+	$(_V)$(CC) $(CFLAGS) -c -o $(BUILDDIR)/$*.lua.o $(BUILDDIR)/$*.c
+
+# Include dependency files if they exist
+# --------------------------------------
+
+-include $(DEPS)

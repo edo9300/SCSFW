@@ -1,9 +1,7 @@
 #include "new_scsdio.h"
-#ifdef NDS
-#include <nds.h>
-#else
-#include <gba.h>
-#endif
+
+#define	REG_BASE	0x04000000
+#define	REG_IME	*(vu16*)(REG_BASE + 0x208)	// Interrupt Master Enable
 
 static bool isSDHC;
 

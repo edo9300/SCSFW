@@ -17,17 +17,21 @@ To use in GBA mode, a setup with SCFW is expected
 When used in passme mode, nds hbmenu will be loaded, and from there other homebrews can be loaded from the SD
 
 ## Building
-Both blocksds and devkitpro (if you want to build a different GBA booter) are required
+Blocksds is required with `wf-tools`, `target-gba`, and `thirdparty-blocksds-toolchain` installed
 
-If you want to build a different GBA booter:
-With devkitpro set up for gba development, with libgba and libfat-gba installed, run `make` in the `SCFW_Stage2_GBA` folder.
+From a blocksds shell run
+```
+make -C SCFW_Stage2_GBA
+```
+to generate the GBA bootloader
 
 If you want to use a different ds homebrew from hbmenu, replace the `SCFW_Stage2_NDS.NDS` file in the `SCFW_Stage2_NDS`
 
-From a blocksds shell, run from the `SCFW_Stage1` folder
+From a blocksds shell run
 ```
-make
+make -C SCFW_Stage1
 ```
+to generate the final firmware
 
 Keep in mind that the final `firmware.frm` file must not be bigger than `0x80000` bytes
 

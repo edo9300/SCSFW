@@ -1,4 +1,17 @@
-#include <gba.h>
+typedef enum RESTART_FLAG {
+	ROM_RESTART,	/*!< Restart from RAM entry point. */
+	RAM_RESTART		/*!< restart from ROM entry point */
+} RESTART_FLAG;
+
+#define EWRAM_BSS	__attribute__((section(".bss.iwram")))
+void SoftReset(RESTART_FLAG RestartFlag);
+#if	defined	( __thumb__ )
+#define	SystemCall(Number)	 __asm ("SWI	  "#Number"\n" :::  "r0", "r1", "r2", "r3")
+#else
+#define	SystemCall(Number)	 __asm ("SWI	  "#Number"	<< 16\n" :::"r0", "r1", "r2", "r3")
+#endif
+static inline void VBlankIntrWait() { SystemCall(5); }
+
 #include "fatfs/ff.h"
 
 #include "new_scsdio.h"

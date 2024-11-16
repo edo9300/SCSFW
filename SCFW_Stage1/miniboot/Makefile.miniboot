@@ -91,7 +91,7 @@ CFLAGS		:= -std=gnu2x $(WARNFLAGS) $(DEFINES) -ffreestanding -nostdlib \
 		   $(INCLUDEFLAGS) -ffunction-sections -fdata-sections -Oz -flto
 
 CXXFLAGS	:= -std=gnu++20 $(WARNFLAGS) $(DEFINES) -ffreestanding -nostdlib \
-		   $(INCLUDEFLAGS) -ffunction-sections -fdata-sections -Oz -flto
+		   $(INCLUDEFLAGS) -ffunction-sections -fdata-sections -fno-rtti -fno-exceptions -Oz -flto
 
 LDFLAGS		:= $(DEFINES) -Wl,-Map,$(MAP) -Wl,--gc-sections -nostdlib -lgcc \
 		   -Wl,--no-warn-rwx-segments -Tsource/$(LINKSCRIPT).ld -flto
