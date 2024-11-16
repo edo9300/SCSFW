@@ -1,9 +1,14 @@
-*/build
+**/build
+**/dist
 *.nds
 *.gba
 *.elf
 *.frm
 *.out
+*.d
+*.o
+*.json
+*.map
 data/*.bin
 .vscode
 *.DS_Store
