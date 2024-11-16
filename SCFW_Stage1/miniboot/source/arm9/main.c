@@ -65,6 +65,13 @@ void readNds(void* dest, unsigned int offset, unsigned int size) {
 
 #define SECURE_AREA_FROM_FW (*((volatile uint32_t*)0x2000000))
 #define SECURE_AREA_FROM_FW_2 (*((volatile uint32_t*)0x2004000))
+#define CHIPID (*((volatile uint32_t*)0x027FF800))
+
+typedef struct SUPERCARD_RAM_DATA {
+	uint8_t header[0x200];
+	uint8_t secure_area[0x4000];
+	uint32_t chipid;
+} SUPERCARD_RAM_DATA;
 
 static void backupDecryptedHeaderAndSecureAreaAndHeaderToSCRam(void) {
 	volatile uint32_t* secure_area_ptr = 0;
@@ -85,8 +92,10 @@ static void backupDecryptedHeaderAndSecureAreaAndHeaderToSCRam(void) {
 	str_buff[5] = 0;
 	dprintf("Loaded game code is: %s\n", str_buff);
 	sc_change_mode(0x5);
-	__aeabi_memcpy4(GBA_BUS, NDS_HEADER, 0x200);
-	__aeabi_memcpy4((GBA_BUS_U8 + 0x200), secure_area_ptr, 0x4000);
+	SUPERCARD_RAM_DATA* ram_data = ((SUPERCARD_RAM_DATA*)GBA_BUS);
+	__aeabi_memcpy4(ram_data->header, NDS_HEADER, 0x200);
+	__aeabi_memcpy4(ram_data->secure_area, secure_area_ptr, 0x4000);
+	ram_data->chipid = CHIPID;
 	sc_change_mode(en_write);
 }
 
