@@ -1,3 +1,6 @@
+.arm
+.syntax unified
+	
 cart_base:
 .org 0x00
 	b entrypoint
@@ -20,6 +23,18 @@ cart_base:
 .org 0xc0
 .set supercard_switch_mode_offset, 0x9000
 entrypoint:
+	b real_entrypoint
+	.word miniboot_arm7
+	.word (miniboot_arm7_end - miniboot_arm7)
+	.word miniboot_arm9
+	.word (miniboot_arm9_end - miniboot_arm9)
+	.word nds_rom
+	.word (nds_rom_end - nds_rom)
+	.word sc_lite_dldi
+	.word (sc_lite_dldi_end - sc_lite_dldi)
+	.word scsd_dldi
+	.word (scsd_dldi_end - sc_lite_dldi)
+real_entrypoint:
 	# copy and run this fn from RAM
 	mov r0, #0x02000000
 	add r0, r0, $supercard_switch_mode_offset
@@ -96,40 +111,33 @@ move_secure_area_loop:
 	str r4, [r2], # 4
 	cmp r1, r3
 	blt move_secure_area_loop
-load_nds_binaries:
-	adrl r0, nds_rom
 
-	#arm9 rom_offset
-	ldr r1, [r0, # 0x20]
-	#arm9 ram_address (destination)
-	ldr r2, [r0, # 0x28]
-	#arm9 size
-	ldr r3, [r0, # 0x2c]
-	add r1, r1, r0 
-	add r3, r3, r1
-load_nds_arm9_loop:
-	ldr r4, [r1], # 4
-	str r4, [r2], # 4
-	cmp r1, r3
-	blt load_nds_arm9_loop
-	#arm7 rom_offset
-	ldr r1, [r0, # 0x30]
-	#arm7 ram_address (destination)
-	ldr r2, [r0, # 0x38]
-	#arm7 size
-	ldr r3, [r0, # 0x3c]
-	add r1, r1, r0
-	add r3, r3, r1
-load_nds_arm7_loop:
-	ldr r4, [r1], # 4
-	str r4, [r2], # 4
-	cmp r1, r3
-	blt load_nds_arm7_loop
+load_nds_binaries:
+	mov r2, # 0x02000000
+	add r2, r2, # 0x8000
+	mov r4, r2
+	adrl r0, miniboot_arm9
+	adrl r1, miniboot_arm9_end
+load_miniboot_arm9_loop:
+	ldr r3, [r0], # 4
+	str r3, [r2], # 4
+	cmp r0, r1
+	blt load_miniboot_arm9_loop
+	
+	mov r2, # 0x03800000
+	adrl r0, miniboot_arm7
+	adrl r1, miniboot_arm7_end
+load_miniboot_arm7_loop:
+	ldr r3, [r0], # 4
+	str r3, [r2], # 4
+	cmp r0, r1
+	blt load_miniboot_arm7_loop
+	
+	# reset arm9
 	mov r1, # 0x02800000
 	sub r1, r1, # 0x200
-	ldr r2, [r0, # 0x24]
-	str r2, [r1, # 0x24]
-	ldr lr, [r0, # 0x34]
+	str r4, [r1, # 0x24]
+	mov lr, # 0x03800000
 	bx lr
 
 sc_mode_flash_rw:
@@ -151,7 +159,27 @@ gba_rom:
 gba_rom_end:
 
 .balign 4, 0xff
+miniboot_arm7:
+.incbin "miniboot/build/arm7.bin"
+miniboot_arm7_end:
+
+.balign 4, 0xff
+miniboot_arm9:
+.incbin "miniboot/build/arm9.bin"
+miniboot_arm9_end:
+
+.balign 4, 0xff
 nds_rom:
 .incbin "../SCFW_Stage2_NDS/SCFW_Stage2_NDS.nds"
 nds_rom_end:
+
+.balign 4, 0xff
+sc_lite_dldi:
+.incbin "../dldi/sc-lite.dldi"
+sc_lite_dldi_end:
+
+.balign 4, 0xff
+scsd_dldi:
+.incbin "../dldi/scsd.dldi"
+scsd_dldi_end:
 
