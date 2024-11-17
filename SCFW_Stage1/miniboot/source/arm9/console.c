@@ -90,26 +90,18 @@ void consoleInit(void) {
 
     // Draw header, initialize cursor X/Y.
     displayInitialized = true;
-    fontX = (32 - 8) >> 1;
+    fontX = (32 - 18) >> 1;
     fontY = 0;
     fontPalette = 0x0000;
     fontLimited = false;
-    eprintf("miniboot");
+    eprintf("SuperCard miniboot");
 
     {
         fontY = 1;
         fontPalette = 0x1000;
-        int len = strlen(_io_dldi_stub.friendlyName);
-        if (len > 32) {
-            fontX = 0;
-            char c = _io_dldi_stub.friendlyName[29];
-            _io_dldi_stub.friendlyName[29] = 0;
-            eprintf("%s...", _io_dldi_stub.friendlyName);
-            _io_dldi_stub.friendlyName[29] = c;
-        } else {
-            fontX = (32 - len) >> 1;
-            eprintf("%s", _io_dldi_stub.friendlyName);
-        }
+        const char* str = "v1.1";
+        fontX = (32 - 4) >> 1;
+        eprintf("%s", str);
     }
 
     fontX = FONT_X_MIN;
