@@ -68,31 +68,42 @@ void readNds(void* dest, unsigned int offset, unsigned int size) {
 #define CHIPID (*((volatile uint32_t*)0x027FF800))
 
 typedef struct SUPERCARD_RAM_DATA {
+	uint8_t magicString[8];
 	uint8_t header[0x200];
 	uint8_t secure_area[0x4000];
 	uint32_t chipid;
 } SUPERCARD_RAM_DATA;
 
 static void backupDecryptedHeaderAndSecureAreaAndHeaderToSCRam(void) {
+	uint8_t magicString[8] = {'S', 'C', 'S', 'F', 'W', 0, 0, 0};
+	uint8_t magicString2[8] = {0, 0, 0, 0, 0, 0, 0, 0};
 	volatile uint32_t* secure_area_ptr = 0;
+	uint8_t* magicStringPtr = magicString;
+	SUPERCARD_RAM_DATA* ram_data = ((SUPERCARD_RAM_DATA*)GBA_BUS);
 	
 	if(SECURE_AREA_FROM_FW != 0) {
 		secure_area_ptr = &SECURE_AREA_FROM_FW;
 	} else if(SECURE_AREA_FROM_FW_2 != 0) {
 		secure_area_ptr = &SECURE_AREA_FROM_FW_2;
 	}
-	if(secure_area_ptr == 0)
-		return;
-	dprintf("Fround secure area at address: 0x%X\n", (intptr_t)secure_area_ptr);
-	char str_buff[13];
-	__aeabi_memcpy(str_buff, NDS_HEADER->game_title, 12);
-	str_buff[13] = 0;
-	dprintf("Loaded game is: %s\n", str_buff);
-	__aeabi_memcpy(str_buff, NDS_HEADER->game_code, 4);
-	str_buff[5] = 0;
-	dprintf("Loaded game code is: %s\n", str_buff);
+	if(secure_area_ptr == 0) {
+		// this juggling is needed because otherwise either the supercard itself
+		// or gcc simply made a single byte write not work
+		dprintf("No secure area found\n");
+		secure_area_ptr = &SECURE_AREA_FROM_FW;
+		magicStringPtr = magicString2;
+	} else {
+		dprintf("Fround secure area at address: 0x%X\n", (intptr_t)secure_area_ptr);
+		char str_buff[13];
+		__aeabi_memcpy(str_buff, NDS_HEADER->game_title, 12);
+		str_buff[13] = 0;
+		dprintf("Loaded game is: %s\n", str_buff);
+		__aeabi_memcpy(str_buff, NDS_HEADER->game_code, 4);
+		str_buff[5] = 0;
+		dprintf("Loaded game code is: %s\n", str_buff);
+	}
 	sc_change_mode(0x5);
-	SUPERCARD_RAM_DATA* ram_data = ((SUPERCARD_RAM_DATA*)GBA_BUS);
+	__aeabi_memcpy(ram_data->magicString, magicStringPtr, 8);
 	__aeabi_memcpy4(ram_data->header, NDS_HEADER, 0x200);
 	__aeabi_memcpy4(ram_data->secure_area, secure_area_ptr, 0x4000);
 	ram_data->chipid = CHIPID;
@@ -100,7 +111,6 @@ static void backupDecryptedHeaderAndSecureAreaAndHeaderToSCRam(void) {
 }
 
 int main(void) {
-    unsigned int bytes_read;
     int result;
 
     // Initialize VRAM (128KB to main engine, rest to CPU, 32KB WRAM to ARM7).
