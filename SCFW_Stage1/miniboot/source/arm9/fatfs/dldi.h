@@ -60,6 +60,4 @@ typedef struct DLDI_INTERFACE {
     bool (*shutdown)(void);
 } DLDI_INTERFACE;
 
-extern DLDI_INTERFACE _io_dldi_stub;
-
 #endif // LIBNDS_NDS_ARM9_DLDI_H__
