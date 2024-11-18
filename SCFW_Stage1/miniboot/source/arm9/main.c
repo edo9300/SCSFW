@@ -131,7 +131,7 @@ int main(void) {
 #ifdef DEBUG
     debugEnabled = true;
 #else
-    debugEnabled = !(REG_KEYINPUT & KEY_START);
+    debugEnabled = ((~REG_KEYINPUT) & (KEY_L | KEY_R)) == (KEY_L | KEY_R);
 #endif
 #endif
 	sysSetCartOwner(true);
@@ -264,7 +264,7 @@ int main(void) {
     dprintf("Launching");
 
     // If debug enabled, wait for user to stop holding START
-    if (debugEnabled) while (!(REG_KEYINPUT & KEY_START));
+    if (debugEnabled) while (((~REG_KEYINPUT) & (KEY_L | KEY_R)) == (KEY_L | KEY_R));
 
     // Restore/clear system state.
     displayReset();
