@@ -12,8 +12,8 @@ GBATOOL	:= $(WONDERFUL_TOOLCHAIN)/bin/wf-gbatool
 OBJCOPY	:= $(WONDERFUL_TOOLCHAIN)/toolchain/gcc-arm-none-eabi/bin/arm-none-eabi-objcopy
 AS		:= $(WONDERFUL_TOOLCHAIN)/toolchain/gcc-arm-none-eabi/bin/arm-none-eabi-as
 CP		:= cp
-MAKE		:= make
-MKDIR		:= mkdir
+MAKE	:= make
+MKDIR	:= mkdir
 RM		:= rm -rf
 
 # Verbose flag
@@ -35,12 +35,12 @@ all: stage1
 
 clean:
 	@echo "  CLEAN"
-	$(_V)$(RM) build miniboot/build miniboot/dist
+	$(_V)$(RM) build miniboot/build miniboot/dist firmware.frm
 
 stage1: miniboot
 	@$(MKDIR) -p build
-	$(_V)$(AS) scfw.s -o build/scfw.out
-	$(_V)$(OBJCOPY) -O binary build/scfw.out build/firmware.frm
+	$(_V)$(AS) scsfw.s -o build/scsfw.out
+	$(_V)$(OBJCOPY) -O binary build/scsfw.out build/firmware.frm
 	$(_V)$(GBATOOL) fix -l official build/firmware.frm
 
 miniboot:
