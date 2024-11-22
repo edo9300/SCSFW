@@ -9,7 +9,7 @@ export BLOCKSDS ?= /opt/blocksds/core
 # -----
 
 GBATOOL	:= $(WONDERFUL_TOOLCHAIN)/bin/wf-gbatool
-OBJCOPY		:= $(WONDERFUL_TOOLCHAIN)/toolchain/gcc-arm-none-eabi/bin/arm-none-eabi-objcopy
+OBJCOPY	:= $(WONDERFUL_TOOLCHAIN)/toolchain/gcc-arm-none-eabi/bin/arm-none-eabi-objcopy
 AS		:= $(WONDERFUL_TOOLCHAIN)/toolchain/gcc-arm-none-eabi/bin/arm-none-eabi-as
 CP		:= cp
 MAKE		:= make
