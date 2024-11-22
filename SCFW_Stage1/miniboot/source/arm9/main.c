@@ -10,7 +10,7 @@
 #include "console.h"
 #include "scsd/sc_commands.h"
 
-#define DEBUG
+// #define DEBUG
 
 #define DLDI_BACKUP   ((DLDI_INTERFACE*) 0x6820000)
 #define checkErrorFatFs(...) do {(void)0; } while(0)
