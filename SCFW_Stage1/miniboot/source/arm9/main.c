@@ -44,7 +44,10 @@ void sysSetCartOwner(bool arm9) {
   REG_EXMEMCNT = (REG_EXMEMCNT & ~ARM7_OWNS_ROM) | (arm9 ? 0 :  ARM7_OWNS_ROM);
 }
 
+#define SCSFW_MAGIC 0x57464353
+
 typedef struct SCSFW_PARAMETERS {
+	unsigned int scsfw_magic;
 	unsigned int miniboot_arm7;
 	unsigned int miniboot_arm7_size;
 	unsigned int miniboot_arm9;
@@ -61,6 +64,16 @@ SCSFW_PARAMETERS parameters;
 
 void readNds(void* dest, unsigned int offset, unsigned int size) {
 	__aeabi_memcpy(dest, (void*)&GBA_BUS_U8[parameters.nds_rom + offset], size);
+}
+
+void findSCSFWParameters(SCSFW_PARAMETERS* params) {
+	__aeabi_memcpy4(params, (void*)&GBA_BUS_U8[0xc0 + 4], sizeof(SCSFW_PARAMETERS));
+	if(params->scsfw_magic == 0x57464353) {
+		dprintf("sclite magic found\n");
+		return;
+	}
+	// supercard rumble
+	__aeabi_memcpy4(params, (void*)&GBA_BUS_U8[4 + 0x40000], sizeof(SCSFW_PARAMETERS));
 }
 
 #define SECURE_AREA_FROM_FW (*((volatile uint32_t*)0x2000000))
@@ -135,7 +148,7 @@ int main(void) {
 #endif
 #endif
 	sysSetCartOwner(true);
-	__aeabi_memcpy4(&parameters, (void*)&GBA_BUS_U8[0xc0 + 4], sizeof(SCSFW_PARAMETERS));
+	findSCSFWParameters(&parameters);
     dprintf("parameters.miniboot_arm9_size: 0x%X\n", parameters.miniboot_arm9_size);
     dprintf("parameters.miniboot_arm9: 0x%X\n", parameters.miniboot_arm9);
     dprintf("parameters.miniboot_arm7_size: 0x%X\n", parameters.miniboot_arm7_size);

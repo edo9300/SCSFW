@@ -1,29 +1,10 @@
 .arm
 .syntax unified
-	
-cart_base:
-.org 0x00
-	b entrypoint
-.org 0x04
-	.fill 0x9c, 0, 0
-.org 0xa0
-	.ascii "DsBooterSCFW"
-.org 0xac
-	.ascii "PASSsc"
-.org 0xb2
-	.byte 0x96
-.org 0xb4
-	.fill 8, 0, 0
-.org 0xbc
-	.byte 0
-.org 0xbd
-	.fill 3, 0, 0
 
-
-.org 0xc0
-.set supercard_switch_mode_offset, 0x9000
+.org 0x40000
 entrypoint:
 	b real_entrypoint
+	.word 0x57464353 @ SCFW spelled backwards
 	.word miniboot_arm7
 	.word (miniboot_arm7_end - miniboot_arm7)
 	.word miniboot_arm9
@@ -34,6 +15,17 @@ entrypoint:
 	.word (sc_lite_dldi_end - sc_lite_dldi)
 	.word scsd_dldi
 	.word (scsd_dldi_end - sc_lite_dldi)
+.org 0x40060
+	ldr pc, real_address
+real_address:
+        .word   0x08040000
+
+.org 0x4006c
+	.word 0x00005A5A
+.org 0x40070
+	.word (0x2380000 + 0x2c4) - 0x60
+
+.set supercard_switch_mode_offset, 0x9000
 real_entrypoint:
 	# copy and run this fn from RAM
 	mov r0, #0x02000000
@@ -119,7 +111,7 @@ sc_mode_flash_rw:
 	add r1, # 0xa500
 	strh r1, [r0]
 	strh r1, [r0]
-	mov r1, # 4
+	mov r1, # 0
 	strh r1, [r0]
 	strh r1, [r0]
 	bx lr
