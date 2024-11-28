@@ -14,6 +14,8 @@ AS		:= $(WONDERFUL_TOOLCHAIN)/toolchain/gcc-arm-none-eabi/bin/arm-none-eabi-as
 CP		:= cp
 MAKE	:= make
 MKDIR	:= mkdir
+DD		:= dd
+CAT		:= cat
 RM		:= rm -rf
 
 # Verbose flag
@@ -32,6 +34,7 @@ endif
 
 all: stage1
 	$(_V)$(CP) build/firmware.frm firmware.frm
+	$(_V)$(CP) build/firmware-rumble.frm firmware-rumble.frm
 
 clean:
 	@echo "  CLEAN"
@@ -41,7 +44,10 @@ stage1: miniboot
 	@$(MKDIR) -p build
 	$(_V)$(AS) scsfw.s -o build/scsfw.out
 	$(_V)$(OBJCOPY) -O binary build/scsfw.out build/firmware.frm
+	$(_V)$(DD) if=/dev/zero bs=1 count=262144 > build/padding-rumble.bin
+	$(_V)$(CAT) build/padding-rumble.bin build/firmware.frm > build/firmware-rumble.frm
 	$(_V)$(GBATOOL) fix -l official build/firmware.frm
+	$(_V)$(GBATOOL) fix -l official build/firmware-rumble.frm
 
 miniboot:
 	$(_V)+$(MAKE) -C miniboot --no-print-directory

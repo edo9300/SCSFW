@@ -73,7 +73,13 @@ void findSCSFWParameters(SCSFW_PARAMETERS* params) {
 		return;
 	}
 	// supercard rumble
-	__aeabi_memcpy4(params, (void*)&GBA_BUS_U8[4 + 0x40000], sizeof(SCSFW_PARAMETERS));
+	__aeabi_memcpy4(params, (void*)&GBA_BUS_U8[0xc0 + 4 + 0x40000], sizeof(SCSFW_PARAMETERS));
+	// account for the values being offsetted
+	params->miniboot_arm7 += 0x40000;
+	params->miniboot_arm9 += 0x40000;
+	params->nds_rom += 0x40000;
+	params->sc_lite_dldi += 0x40000;
+	params->scsd_dldi += 0x40000;
 }
 
 #define SECURE_AREA_FROM_FW (*((volatile uint32_t*)0x2000000))

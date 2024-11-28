@@ -1,7 +1,67 @@
 .arm
 .syntax unified
+	
+cart_base:
+.org 0x00
+	b entrypoint
+.org 0x04
 
-.org 0x40000
+# sc rumble specific code
+# when assembled for the rumble,
+# this file is padded by 0x40000
+
+# all the data from here until 0xa0 will be replaced by
+# the nintendo logo needed for the gba header for the
+# non rumble variant of the firmware
+
+# the "read flash" mode for the sc rumble
+# is mode "0", this would work on the sc lite
+# but doesn't work on the scsd, where it requires
+# mode "4", that in turn doesn't work on the sc rumble
+sc_mode_flash_ro_rumble:
+	mov r0, # 0x0a000000
+	sub r0, r0, #0x02
+	mov r1, # 0x005a
+	add r1, # 0xa500
+	strh r1, [r0]
+	strh r1, [r0]
+	mov r1, # 0
+	strh r1, [r0]
+	strh r1, [r0]
+	ldr pc, real_address
+real_address:
+	.word   0x08040000 + rumble_entrypoint
+
+sc_rumble_overwrite_target:
+	b sc_mode_flash_ro_rumble
+
+# magic value checked by the SuperCard rumble's firmware
+# if the value at 0x4006c is 0x00005A5A
+# it will read the value at 0x40070 as a destination address
+# to which copy the contents of the flash starting off
+# 0x40000, to address 0x2380000, we want to make the function
+# copying the data overwrite itself with our actual entrypoint
+# above so that it gets executed and it will
+# jump back to flash
+.org 0x6c
+	.word 0x00005A5A
+.org 0x70
+	.word (0x2380000 + 0x2c4) - sc_rumble_overwrite_target
+
+.org 0xa0
+	.ascii "DsBooterSCFW"
+.org 0xac
+	.ascii "PASSsc"
+.org 0xb2
+	.byte 0x96
+.org 0xb4
+	.fill 8, 0, 0
+.org 0xbc
+	.byte 0
+.org 0xbd
+	.fill 3, 0, 0
+
+.org 0xc0
 entrypoint:
 	b real_entrypoint
 	.word 0x57464353 @ SCFW spelled backwards
@@ -15,15 +75,6 @@ entrypoint:
 	.word (sc_lite_dldi_end - sc_lite_dldi)
 	.word scsd_dldi
 	.word (scsd_dldi_end - sc_lite_dldi)
-.org 0x40060
-	ldr pc, real_address
-real_address:
-        .word   0x08040000
-
-.org 0x4006c
-	.word 0x00005A5A
-.org 0x40070
-	.word (0x2380000 + 0x2c4) - 0x60
 
 .set supercard_switch_mode_offset, 0x9000
 real_entrypoint:
@@ -42,6 +93,8 @@ sc_mode_flash_rw_loop:
 	add r0, r0, $supercard_switch_mode_offset
 	mov lr, pc
 	mov pc, r0
+
+rumble_entrypoint:
 	
 	# detect GBA/NDS using mirroring
 	mov r0, # 0x02000000
@@ -111,7 +164,7 @@ sc_mode_flash_rw:
 	add r1, # 0xa500
 	strh r1, [r0]
 	strh r1, [r0]
-	mov r1, # 0
+	mov r1, # 4
 	strh r1, [r0]
 	strh r1, [r0]
 	bx lr
