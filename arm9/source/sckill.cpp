@@ -43,7 +43,7 @@ const char* textBuffer = "X------------------------------X\nX-------------------
 
 u32 cachedFlashID;
 u32 statData = 0x00000000;
-u32 firmSize = 0x100000;
+u32 firmSize = 0x200000;
 bool UpdateProgressText = false;
 bool PrintWithStat = true;
 bool ClearOnUpdate = true;
@@ -96,7 +96,7 @@ static u32 get_max_firm_size(SUPERCARD_TYPE scType = SuperCardType) {
 			return 0x7C000;
         case SUPERCARD_TYPE::SC_RUMBLE:
         case SUPERCARD_TYPE::UNK:
-			return 0x100000;
+			return 0x200000;
 		default:
 			__builtin_unreachable();
 	}
