@@ -16,6 +16,12 @@ enum class SC_FLASH_COMMAND : u16 {
 	PROGRAM		= 0xA0,
 	IDENTIFY	= 0x90,
 };
+enum SUPERCARD_TYPE : u8 {
+    SC_SD = 0x00,
+    SC_LITE = 0x01,
+    SC_RUMBLE = (0x10 | SC_LITE),
+    UNK = uint8_t(~SC_RUMBLE)
+};
 
 #define SC_FLASH_IDLE			((u16) 0xF0)
 
@@ -37,35 +43,16 @@ const char* textBuffer = "X------------------------------X\nX-------------------
 
 u32 cachedFlashID;
 u32 statData = 0x00000000;
-u32 firmSize = 0x80000;
+u32 firmSize = 0x200000;
 bool UpdateProgressText = false;
 bool PrintWithStat = true;
 bool ClearOnUpdate = true;
-bool SCLiteMode = false;
+SUPERCARD_TYPE SuperCardType = SUPERCARD_TYPE::UNK;
 bool FileSuccess = false;
 
-static std::pair<vu16*, vu16*> get_magic_addrs(bool isSclite = SCLiteMode) {
-	auto* const SCLITE_FLASH_MAGIC_ADDR_1 = (vu16*)0x08000AAA;
-	auto* const SCLITE_FLASH_MAGIC_ADDR_2 = (vu16*)0x08000554;
-	auto* const SC_FLASH_MAGIC_ADDR_1	 = (vu16*)0x08000b92;
-	auto* const SC_FLASH_MAGIC_ADDR_2	 = (vu16*)0x0800046c;
-	if(isSclite)
-		return { SCLITE_FLASH_MAGIC_ADDR_1, SCLITE_FLASH_MAGIC_ADDR_2 };
-	return { SC_FLASH_MAGIC_ADDR_1, SC_FLASH_MAGIC_ADDR_2 };
-}
-
-static u32 get_max_firm_size(bool isSclite = SCLiteMode) {
-	return isSclite ? 0x7C000 : 0x80000;
-}
-
-static void send_command(SC_FLASH_COMMAND command, bool isSclite = SCLiteMode) {
-	constexpr u16 SC_FLASH_MAGIC_1 = 0x00aa;
-	constexpr u16 SC_FLASH_MAGIC_2 = 0x0055;
-	auto [magic_addr_1, magic_addr_2] = get_magic_addrs(isSclite);
-	*magic_addr_1 = SC_FLASH_MAGIC_1;
-	*magic_addr_2 = SC_FLASH_MAGIC_2;
-	*magic_addr_1 = static_cast<u16>(command);
-}
+constexpr u16 SC_MODE_FLASH_RW				= 0x0004;
+constexpr u16 SC_MODE_SDCARD				= 0x0002;
+constexpr u16 SC_MODE_FLASH_RW_LITE_RUMBLE	= 0x1510;
 
 static void change_mode(u16 mode) {
 	auto* const SC_MODE_REG = (vu16*)0x09FFFFFE;
@@ -76,31 +63,70 @@ static void change_mode(u16 mode) {
 	*SC_MODE_REG = mode;
 }
 
-void sc_flash_rw_enable(bool isSclite = SCLiteMode) {
-	constexpr u16 SC_MODE_FLASH_RW		= 0x0004;
-	constexpr u16 SC_MODE_FLASH_RW_LITE	= 0x1510;
-	change_mode(isSclite ? SC_MODE_FLASH_RW_LITE : SC_MODE_FLASH_RW);
+SUPERCARD_TYPE detect_supercard_type() {
+    change_mode(SC_MODE_SDCARD);
+	auto val = *(volatile uint16_t*)0x09800000;
+    switch(val & 0xe300) {
+        case 0xa000:
+            return SUPERCARD_TYPE::SC_LITE;
+        case 0xc000:
+            return SUPERCARD_TYPE::SC_RUMBLE;
+        case 0xe000:
+            return SUPERCARD_TYPE::SC_SD;
+        default:
+            return SUPERCARD_TYPE::UNK;
+    }
 }
 
-bool try_guess_lite(u32* id) {
-	auto get_flash_id = [](bool lite) -> u32 {
-		static constexpr u16 COMMAND_ERROR = 0x002e;
-		sc_flash_rw_enable(lite);
-		auto [magic_addr_1, magic_addr_2] = get_magic_addrs(lite);
-		send_command(SC_FLASH_COMMAND::IDENTIFY, lite);
-		auto upper_half = *GBA_BUS;
-		auto magic = *magic_addr_1;
-		*GBA_BUS = SC_FLASH_IDLE;
-		if(upper_half == COMMAND_ERROR)
-			return 0;
-		return (upper_half << 16) | magic;
-	};
-	if(*id = get_flash_id(true); *id != 0)
-		return true;
+static std::pair<vu16*, vu16*> get_magic_addrs(SUPERCARD_TYPE scType = SuperCardType) {
+	auto* const SCLITE_FLASH_MAGIC_ADDR_1 = (vu16*)0x08000AAA;
+	auto* const SCLITE_FLASH_MAGIC_ADDR_2 = (vu16*)0x08000554;
+	auto* const SC_FLASH_MAGIC_ADDR_1	 = (vu16*)0x08000b92;
+	auto* const SC_FLASH_MAGIC_ADDR_2	 = (vu16*)0x0800046c;
+	if(scType == SUPERCARD_TYPE::SC_SD)
+		return { SC_FLASH_MAGIC_ADDR_1, SC_FLASH_MAGIC_ADDR_2 };
+	return { SCLITE_FLASH_MAGIC_ADDR_1, SCLITE_FLASH_MAGIC_ADDR_2 };
+}
 
-	*id = get_flash_id(false);
+static u32 get_max_firm_size(SUPERCARD_TYPE scType = SuperCardType) {
+	switch(scType){
+        case SUPERCARD_TYPE::SC_SD:
+			return 0x80000;
+        case SUPERCARD_TYPE::SC_LITE:
+			return 0x7C000;
+        case SUPERCARD_TYPE::SC_RUMBLE:
+        case SUPERCARD_TYPE::UNK:
+			return 0x200000;
+		default:
+			__builtin_unreachable();
+	}
+}
 
-	return false;
+static void send_command(SC_FLASH_COMMAND command, SUPERCARD_TYPE scType = SuperCardType) {
+	constexpr u16 SC_FLASH_MAGIC_1 = 0x00aa;
+	constexpr u16 SC_FLASH_MAGIC_2 = 0x0055;
+	auto [magic_addr_1, magic_addr_2] = get_magic_addrs(scType);
+	*magic_addr_1 = SC_FLASH_MAGIC_1;
+	*magic_addr_2 = SC_FLASH_MAGIC_2;
+	*magic_addr_1 = static_cast<u16>(command);
+}
+
+
+void sc_flash_rw_enable(SUPERCARD_TYPE scType = SuperCardType) {
+	change_mode((scType == SUPERCARD_TYPE::SC_SD) ? SC_MODE_FLASH_RW : SC_MODE_FLASH_RW_LITE_RUMBLE);
+}
+
+u32 get_flash_id(SUPERCARD_TYPE scType = SuperCardType) {
+	static constexpr u16 COMMAND_ERROR = 0x002e;
+	sc_flash_rw_enable(scType);
+	auto [magic_addr_1, magic_addr_2] = get_magic_addrs(scType);
+	send_command(SC_FLASH_COMMAND::IDENTIFY, scType);
+	auto upper_half = *GBA_BUS;
+	auto magic = *magic_addr_1;
+	*GBA_BUS = SC_FLASH_IDLE;
+	if(upper_half == COMMAND_ERROR)
+		return 0;
+	return (upper_half << 16) | magic;
 }
 
 void sc_flash_erase_chip() {
@@ -108,6 +134,58 @@ void sc_flash_erase_chip() {
 	send_command(SC_FLASH_COMMAND::ERASE_CHIP);
 
 	while (*GBA_BUS != *GBA_BUS);
+	*GBA_BUS = SC_FLASH_IDLE;
+}
+
+bool sc_flash_erase_block_rumble(vu16 *addr) {
+	vu16* addr1 = (vu16*)((0xfff8000 & ((intptr_t)addr)) + 0xaaa);
+	vu16* addr2 = (vu16*)((0xfff8000 & ((intptr_t)addr)) + 0x554);
+
+
+	*addr1 = 0xaa;
+	*addr2 = 0x55;
+	*addr1 = 0x80;
+
+	*addr1 = 0xaa;
+	*addr2 = 0x55;
+	*addr = 0x30;
+
+	for(int i = 0x3d0000; i >= 0; --i) {
+		if(*addr == 0xffff)
+			return true;
+	}
+	return false;
+}
+
+void sc_flash_erase_block(vu16 *addr, SUPERCARD_TYPE scType = SuperCardType)
+{
+	constexpr u16 SC_FLASH_MAGIC_1 = 0x00aa;
+	constexpr u16 SC_FLASH_MAGIC_2 = 0x0055;
+	auto [magic_addr_1, magic_addr_2] = get_magic_addrs(scType);
+	send_command(SC_FLASH_COMMAND::ERASE);
+
+	*magic_addr_1 = SC_FLASH_MAGIC_1;
+	*magic_addr_2 = SC_FLASH_MAGIC_2;
+	*addr = (u16)SC_FLASH_COMMAND::ERASE_BLOCK;
+
+	while (*GBA_BUS != *GBA_BUS) ;
+	*GBA_BUS = SC_FLASH_IDLE;
+}
+
+void sc_flash_program_rumble(vu16 *addr, u16 val)  {
+	vu16* addr1 = (vu16*)((0xfff8000 & ((intptr_t)addr)) + 0xaaa);
+	vu16* addr2 = (vu16*)((0xfff8000 & ((intptr_t)addr)) + 0x554);
+
+	*addr1 = 0xaa;
+	*addr2 = 0x55;
+	*addr1 = 0xa0;
+
+	*addr = val;
+
+	for(int i = 0x100; i >= 0; --i) {
+		if(*addr == val)
+			break;
+	}
 	*GBA_BUS = SC_FLASH_IDLE;
 }
 
@@ -128,8 +206,14 @@ bool DoFlash() {
 	printf("      Erased whole chip\n");
 	for (int i = 0; i < 60; i++)swiWaitForVBlank();
 	auto total = (firmSize + 1) / 2; // account for odd sizes
-	for (u32 off = 0; off < total; ++off) {
-		sc_flash_program(FLASH_BASE+off, scfw_buffer[off]);
+	u32 off = 0;
+	auto* flash_function = &sc_flash_program;
+	if(SuperCardType == SUPERCARD_TYPE::SC_RUMBLE) { // first 0x40000 bytes of a supercard rumble are read only
+		off = (0x40000 / 2);
+		flash_function = &sc_flash_program_rumble;
+	}
+	for (; off < (total); ++off) {
+		(*flash_function)(FLASH_BASE+off, scfw_buffer[off]);
 		if (!UpdateProgressText && !(off & 0x007f)) {
 			textBuffer = "\n\n\n\n\n\n\n\n\n\n\n      Programmed ";
 			statData = (uintptr_t)(FLASH_BASE+off);
@@ -169,10 +253,19 @@ void CustomConsoleInit() {
 
 void printHeader() {
 	consoleSelect(&tpConsole);
-	if (SCLiteMode) {
-		textBuffer = "\n\n         [SCLITE MODE]\n\n\n\n\n\n\n\n\n        Flash ID ";
-	} else {
-		textBuffer = "\n\n\n\n\n\n\n\n\n\n\n        Flash ID ";
+	switch(SuperCardType) {
+		case SUPERCARD_TYPE::SC_SD:
+			textBuffer = "\n\n\n\n\n\n\n\n\n\n\n        Flash ID ";
+			break;
+		case SUPERCARD_TYPE::SC_LITE:
+			textBuffer = "\n\n         [SCLITE MODE]\n\n\n\n\n\n\n\n\n        Flash ID ";
+			break;
+		case SUPERCARD_TYPE::SC_RUMBLE:
+			textBuffer = "\n\n         [RUMBLE MODE]\n\n\n\n\n\n\n\n\n        Flash ID ";
+			break;
+		case SUPERCARD_TYPE::UNK:
+			textBuffer = "\n\n           [UNKNOWN]\n\n\n\n\n\n\n\n\n        Flash ID ";
+			break;
 	}
 	statData = cachedFlashID;
 	UpdateProgressText = true;
@@ -186,7 +279,21 @@ bool Prompt() {
 		scanKeys();
 		if ((keysDown() & KEY_UP) || (keysDown() & KEY_DOWN) || (keysDown() & KEY_LEFT) || (keysDown() & KEY_RIGHT)) {
 			consoleSelect(&tpConsole);
-			SCLiteMode = !SCLiteMode;
+			auto get_next = [](SUPERCARD_TYPE cur_mode){
+				switch(cur_mode) {
+					case SUPERCARD_TYPE::SC_SD:
+						return SUPERCARD_TYPE::SC_LITE;
+					case SUPERCARD_TYPE::SC_LITE:
+						return SUPERCARD_TYPE::SC_RUMBLE;
+					case SUPERCARD_TYPE::SC_RUMBLE:
+						return SUPERCARD_TYPE::SC_SD;
+					case SUPERCARD_TYPE::UNK:
+						return SUPERCARD_TYPE::SC_SD;
+					default:
+						__builtin_unreachable();
+				}
+			};
+			SuperCardType = get_next(SuperCardType);
 			printHeader();
 			consoleSelect(&btConsole);
 		} else {
@@ -239,13 +346,15 @@ int main(void) {
 		}
 		return 0;
 	}
-	SCLiteMode = try_guess_lite(&cachedFlashID);
-	if(cachedFlashID == 0) {
+	SuperCardType = detect_supercard_type();
+	cachedFlashID = get_flash_id();
+	if(cachedFlashID == 0 || SuperCardType == SUPERCARD_TYPE::UNK) {
 		textBuffer = "\n\n\n\n\n\n\n\n\n\nThe cart has not been recognized\n\n"
 					 "If you're sure you got a\n"
-					 "supercard\nYou'll have to manually\n"
-					 "pick if it's a supercard lite\n"
-					 "or normal";
+					 "supercard\n"
+					 "You'll have to manually\n"
+					 "pick if it's a supercard lite,\n"
+					 "rumble or normal";
 		PrintWithStat = false;
 		UpdateProgressText = true;
 		while(UpdateProgressText)swiWaitForVBlank();
@@ -283,8 +392,7 @@ int main(void) {
 				printf("\n\n\n\n\n\n\n\n     [FOUND FIRMWARE.FRM]");
 				consoleSelect(&btConsole);
 				printf("\n Reading FIRMWARE.FRM\n\n Please Wait...");
-				fread((u8*)scfw_buffer, 1, firmSize, src);
-				FileSuccess = true;
+				FileSuccess = fread((u8*)scfw_buffer, firmSize, 1, src) == 1;
 				fclose(src);
 				consoleClear();
 			} else {
@@ -299,7 +407,6 @@ int main(void) {
 
 	if (!FileSuccess) {
 		consoleSelect(&btConsole);
-		toncset(scfw_buffer, 0xFF, get_max_firm_size());
 		tonccpy(scfw_buffer, scfw_bin, (scfw_binEnd - scfw_bin));
 		firmSize = (scfw_binEnd - scfw_bin);
 	}
