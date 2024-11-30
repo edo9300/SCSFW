@@ -39,7 +39,8 @@ sc_rumble_overwrite_target:
 # if the value at 0x4006c is 0x00005A5A
 # it will read the value at 0x40070 as a destination address
 # to which copy the contents of the flash starting off
-# 0x40000, to address 0x2380000, we want to make the function
+# 0x40000.
+# We want to make the function
 # copying the data overwrite itself with our actual entrypoint
 # above so that it gets executed and it will
 # jump back to flash
