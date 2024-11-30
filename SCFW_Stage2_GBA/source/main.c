@@ -41,7 +41,10 @@ int main() {
     if((err = f_mount(&gFatFs, "fat:", 1)) != FR_OK) {
 		tryAgain();
 	}
-	if ((err = f_open(&kernel, "fat:/scfw/kernel.gba", FA_READ)) != FR_OK) {
+	if ((err = f_open(&kernel, "fat:/scfw/kernel.gba", FA_READ)) != FR_OK
+		&& (err = f_open(&kernel, "fat:/scsfw/kernel.gba", FA_READ)) != FR_OK
+		&& (err = f_open(&kernel, "fat:/kernel.gba", FA_READ)) != FR_OK
+		) {
 		tryAgain();
 	}
 
