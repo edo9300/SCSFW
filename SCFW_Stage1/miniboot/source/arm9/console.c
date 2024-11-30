@@ -99,7 +99,7 @@ void consoleInit(void) {
     {
         fontY = 1;
         fontPalette = 0x1000;
-        const char* str = "v1.1";
+        const char* str = "v1.2";
         fontX = (32 - 4) >> 1;
         eprintf("%s", str);
     }
