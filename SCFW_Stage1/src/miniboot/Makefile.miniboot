@@ -15,7 +15,7 @@ ASSETDIRS	:=
 ifeq ($(TARGET),arm9)
 CPU		:= arm9
 LINKSCRIPT	:= arm9
-SOURCEDIRS	+= source/arm9 source/arm9/fatfs source/arm9/scsd
+SOURCEDIRS	+= fatfs source/arm9 source/arm9/fatfs source/arm9/scsd
 ASSETDIRS	+= source/arm9
 else
 ifeq ($(TARGET),arm7)
