@@ -11,6 +11,7 @@ export BLOCKSDS ?= /opt/blocksds/core
 GBATOOL	:= $(WONDERFUL_TOOLCHAIN)/bin/wf-gbatool
 OBJCOPY	:= $(WONDERFUL_TOOLCHAIN)/toolchain/gcc-arm-none-eabi/bin/arm-none-eabi-objcopy
 AS		:= $(WONDERFUL_TOOLCHAIN)/toolchain/gcc-arm-none-eabi/bin/arm-none-eabi-as
+CC		:= $(WONDERFUL_TOOLCHAIN)/toolchain/gcc-arm-none-eabi/bin/arm-none-eabi-gcc
 CP		:= cp
 MAKE	:= make
 MKDIR	:= mkdir
@@ -38,16 +39,21 @@ all: stage1
 
 clean:
 	@echo "  CLEAN"
-	$(_V)$(RM) build miniboot/build miniboot/dist firmware.frm
+	$(_V)$(RM) build src/miniboot/build src/miniboot/dist firmware.frm firmware-rumble.frm
 
-stage1: miniboot
+stage1: miniboot set_backlight
 	@$(MKDIR) -p build
-	$(_V)$(AS) scsfw.s -o build/scsfw.out
+	$(_V)$(AS) -I src src/scsfw.s -o build/scsfw.out
 	$(_V)$(OBJCOPY) -O binary build/scsfw.out build/firmware.frm
 	$(_V)$(DD) if=/dev/zero bs=1 count=262144 > build/padding-rumble.bin
 	$(_V)$(CAT) build/padding-rumble.bin build/firmware.frm > build/firmware-rumble.frm
 	$(_V)$(GBATOOL) fix -l official build/firmware.frm
 	$(_V)$(GBATOOL) fix -l official build/firmware-rumble.frm
 
+set_backlight:
+	@$(MKDIR) -p build
+	$(_V)$(CC) -std=gnu23 -nostartfiles -nostdlib -T src/backlight.ld -ffreestanding -ffunction-sections -fpic -fPIC -O3 src/set_backlight.c -o build/set_backlight.o
+	$(_V)$(OBJCOPY) -O binary -j .text build/set_backlight.o build/set_backlight.bin
+
 miniboot:
-	$(_V)+$(MAKE) -C miniboot --no-print-directory
+	$(_V)+$(MAKE) -C src/miniboot --no-print-directory

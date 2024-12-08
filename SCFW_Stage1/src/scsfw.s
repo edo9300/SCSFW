@@ -127,7 +127,7 @@ load_gba_loop:
 nds_code:
 	# sets the power flag to the one preferred by the firmware and
 	# clears the flag that sets the maximum brightness when plugged in
-	bl removePowerFlag
+	bl read_backlight_from_firmware
 
 #the ds firmware stores the decrypted secure area of games at either 0x02000000 or 0x02004000
 #don't touch that memory region
@@ -171,61 +171,13 @@ sc_mode_flash_rw:
 	bx lr
 sc_mode_flash_rw_end:
 
-
-# generated asm from set_backlight.c
-
-.set SPI_BUSY, 0x80
-.set SPI_CNT_OFF, 0xC0
-.set SPI_DATA_OFF, 0xC2
-writePowerManagement:
-	ldr	r3, .L8
-.L2:
-	ldrh	r2, [r3, $SPI_CNT_OFF]
-	tst	r2, $SPI_BUSY
-	bne	.L2
-	ldr	r2, .L8+4
-	strh	r2, [r3, $SPI_CNT_OFF]
-	strh	r0, [r3, $SPI_DATA_OFF]
-.L3:
-	ldrh	r2, [r3, $SPI_CNT_OFF]
-	tst	r2, $SPI_BUSY
-	bne	.L3
-	ldr	r2, .L8+8
-	strh	r2, [r3, $SPI_CNT_OFF]
-	strh	r1, [r3, $SPI_DATA_OFF]
-.L4:
-	ldrh	r2, [r3, $SPI_CNT_OFF]
-	tst	r2, $SPI_BUSY
-	bne	.L4
-	ldrh	r0, [r3, $SPI_DATA_OFF]
-	and	r0, r0, # 0xff
-	bx	lr
-.L8:
-	.word	0x04000100
-	# SPI_ENABLE | SPI_BAUD_1MHz | SPI_BYTE_MODE | SPI_CONTINUOUS | SPI_DEVICE_POWER
-	.word	0x8802
-	# SPI_ENABLE | SPI_BAUD_1MHz | SPI_BYTE_MODE | SPI_DEVICE_POWER
-	.word	0x8002
-
-removePowerFlag:
-	mov	r1, # 0
-	push	{r4, lr}
-	mov	r0, # 0x84
-	bl	writePowerManagement
-	ldr	r3, .L12
-	ldrb	r1, [r3, #-27]	@ zero_extendqisi2
-	and	r0, r0, # 0xF8
-	lsl	r1, r1, # 0x1A
-	orr	r1, r0, r1, lsr # 30
-	pop	{r4, lr}
-	mov	r0, # 4
-	b	writePowerManagement
-.L12:
-	.word	0x27FFCFF
+.balign 4, 0xff
+read_backlight_from_firmware:
+.incbin "../build/set_backlight.bin"
 
 .balign 4, 0xff
 gba_rom:
-.incbin "../SCFW_Stage2_GBA/SCFW_Stage2_GBA_mb.gba"
+.incbin "../../SCFW_Stage2_GBA/SCFW_Stage2_GBA_mb.gba"
 gba_rom_end:
 
 .balign 4, 0xff
@@ -240,16 +192,16 @@ miniboot_arm9_end:
 
 .balign 4, 0xff
 nds_rom:
-.incbin "../SCFW_Stage2_NDS/SCFW_Stage2_NDS.nds"
+.incbin "../../SCFW_Stage2_NDS/SCFW_Stage2_NDS.nds"
 nds_rom_end:
 
 .balign 4, 0xff
 sc_lite_dldi:
-.incbin "../dldi/sc-lite.dldi"
+.incbin "../../dldi/sc-lite.dldi"
 sc_lite_dldi_end:
 
 .balign 4, 0xff
 scsd_dldi:
-.incbin "../dldi/scsd.dldi"
+.incbin "../../dldi/scsd.dldi"
 scsd_dldi_end:
 
