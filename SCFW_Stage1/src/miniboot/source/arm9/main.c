@@ -15,8 +15,8 @@
 
 static FATFS fs;
 
-void checkErrorFatFs(const char *msg, int result) {
-    if (result == FR_OK) return;
+bool checkErrorFatFs(const char *msg, int result) {
+    if (result == FR_OK) return true;
 
     const char *error_detail = NULL;
     switch (result) {
@@ -34,8 +34,10 @@ void checkErrorFatFs(const char *msg, int result) {
         eprintf("FatFs error %d.", result);
     }
 
-    while(1);
+    return false;
 }
+
+#define checkErrorFatFs(...) do {if(!checkErrorFatFs(__VA_ARGS__)) { readFromSD = false; sc_change_mode(isRumble ? 0 : 4); goto restart_from_error; }} while(0);
 
 /* === Main logic === */
 
@@ -84,6 +86,8 @@ typedef struct SCSFW_PARAMETERS {
 
 SCSFW_PARAMETERS parameters;
 
+bool isRumble = false;
+
 void readBundledNdsFromFlash(void* dest, unsigned int offset, unsigned int size) {
 	__aeabi_memcpy(dest, (void*)&GBA_BUS_U8[parameters.nds_rom + offset], size);
 }
@@ -94,6 +98,8 @@ void findSCSFWParameters(SCSFW_PARAMETERS* params) {
 		dprintf("sclite magic found\n");
 		return;
 	}
+	
+	isRumble = true;
 	// supercard rumble
 	__aeabi_memcpy4(params, (void*)&GBA_BUS_U8[0xc0 + 4 + 0x40000], sizeof(SCSFW_PARAMETERS));
 	// account for the values being offsetted
@@ -236,6 +242,8 @@ int main(void) {
 		readFromSD = true;
 	}
 	
+restart_from_error:
+
 	if(readFromSD) {
 		// Mount the filesystem. Try to open BOOT.NDS.
 		dprintf("DLDI patching miniboot... ");
