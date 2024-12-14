@@ -17,6 +17,8 @@ as the GBA mode firmware.
 ## Usage
 Boot in NDS mode to launch [nds-hbmenu](https://github.com/devkitPro/nds-hb-menu), and from there
 load other homebrews (for example [TWiLightMenu](https://github.com/DS-Homebrew/TWiLightMenu/))  
+This custom firmware supports assigning a specific nds file to specific hotkeys, to configure it
+press A + B when launching it
 For the non Rumble variants, the firmware will store extra information about the currently inserted
 card allowing homebrews accounting for it (like https://github.com/edo9300/nitrohax-usercheat-supercard)
 to boot the inserted card without hotswapping
@@ -29,7 +31,9 @@ The GBA mode is straightforward, the embedded `SCFW_Stage2_GBA.gba` rom is loade
 the currently provided rom will attempt to chainload the `kernel.gba` file.  
 The NDS mode is a multi stage process, for the initial entrypoint, a stripped down version
 of [nds-miniboot](https://github.com/asiekierka/nds-miniboot) is launched, miniboot will then
-take care of loading the embedded `SCFW_Stage2_NDS.NDS`  (currently defaulting to [nds-hbmenu](https://github.com/devkitPro/nds-hb-menu))
+take care of loading the embedded `SCFW_Stage2_NDS.NDS` (currently defaulting to a custom build of
+[nds-hbmenu](https://github.com/devkitPro/nds-hb-menu), that also has support for hotkeys by saving
+the configs on the supercard itself)
 from the flash in a clean environment, also dldi patching it appropriately
 depending on the type of SuperCard used, using either `scsd.dldi` or `sc-lite.dldi` from the dldi folder  
 If the the SuperCard is launched in NDS mode with another game cart inserted in the slot1 (via flashme),
@@ -48,6 +52,7 @@ typedef struct SUPERCARD_RAM_DATA {
 for how to do it)
 
 ## Building
+DevkitARM pre libnds 2.0 is required to build the custom nds-hbmenu present in the `SCFW_Stage2_NDS` nds folder
 Blocksds is required with `wf-tools`, `target-gba`, and `thirdparty-blocksds-toolchain` installed
 
 From a blocksds shell run
@@ -56,7 +61,13 @@ make -C SCFW_Stage2_GBA
 ```
 to generate the GBA bootloader
 
-If you want to use a different ds homebrew from hbmenu, replace the `SCFW_Stage2_NDS.NDS`
+From a DevkitARM shell run
+```
+make -C SCFW_Stage2_NDS
+```
+to generate the NDS hbmenu build (unless you want to use the prebuilt one)
+
+If you want to instead use a different ds homebrew from hbmenu, replace the `SCFW_Stage2_NDS.NDS`
 file in the `SCFW_Stage2_NDS`
 
 From a blocksds shell run

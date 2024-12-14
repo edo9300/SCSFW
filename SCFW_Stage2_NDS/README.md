@@ -1,1 +1,0 @@
-Hbmenu https://github.com/devkitPro/nds-hb-menu/releases/v0.10.0
