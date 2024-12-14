@@ -36,10 +36,10 @@ void configMenu(struct SCSFW_CONFIGS* configs) {
 		};
 
 		printEntry("NO BUTTON", configs->hk_none);
-		printEntry("BUTTON A", configs->hk_a);
-		printEntry("BUTTON B", configs->hk_b);
-		printEntry("BUTTON X", configs->hk_x);
-		printEntry("BUTTON Y", configs->hk_y);
+		printEntry("A/RIGHT", configs->hk_a);
+		printEntry("B/DOWN ", configs->hk_b);
+		printEntry("X/UP   ", configs->hk_x);
+		printEntry("Y/LEFT ", configs->hk_y);
 		
 		auto getEntryPath = [&](int off) -> char* {
 			switch(off) {

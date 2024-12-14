@@ -90,20 +90,24 @@ int main(int argc, char **argv) {
 	
 	scanKeys();
 	
-	switch(keysHeld() & (KEY_A | KEY_B | KEY_X | KEY_Y)) {
+	switch(keysHeld() & (KEY_A | KEY_B | KEY_X | KEY_Y | KEY_UP | KEY_DOWN | KEY_LEFT | KEY_RIGHT)) {
 		case KEY_A | KEY_B:
 			memcpy(executable_path, "CONFIG", sizeof("CONFIG"));
 			break;
 		case KEY_A:
+		case KEY_RIGHT:
 			memcpy(executable_path, confs.hk_a.path, sizeof(confs.hk_a.path));
 			break;
 		case KEY_B:
+		case KEY_DOWN:
 			memcpy(executable_path, confs.hk_b.path, sizeof(confs.hk_b.path));
 			break;
 		case KEY_X:
+		case KEY_UP:
 			memcpy(executable_path, confs.hk_x.path, sizeof(confs.hk_x.path));
 			break;
 		case KEY_Y:
+		case KEY_LEFT:
 			memcpy(executable_path, confs.hk_y.path, sizeof(confs.hk_y.path));
 			break;
 		default:
