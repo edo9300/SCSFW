@@ -28,8 +28,6 @@
 #define DLDI_MAGIC_STRING_LEN   8
 #define DLDI_FRIENDLY_NAME_LEN  48
 
-#define DLDI_BACKUP   ((DLDI_INTERFACE*) 0x6820000)
-
 // I/O interface with DLDI extensions
 typedef struct DLDI_INTERFACE {
     uint32_t magicNumber;
@@ -42,14 +40,14 @@ typedef struct DLDI_INTERFACE {
     char friendlyName [DLDI_FRIENDLY_NAME_LEN];
 
     // Pointers to sections that need address fixing
-    uint8_t *dldiStart;
-    uint8_t *dldiEnd;
-    uint8_t *interworkStart;
-    uint8_t *interworkEnd;
-    uint8_t *gotStart;
-    uint8_t *gotEnd;
-    uint8_t *bssStart;
-    uint8_t *bssEnd;
+    void *dldiStart;
+    void *dldiEnd;
+    void *interworkStart;
+    void *interworkEnd;
+    void *gotStart;
+    void *gotEnd;
+    void *bssStart;
+    void *bssEnd;
 
     // Original I/O interface data
     uint32_t ioType;
@@ -61,7 +59,5 @@ typedef struct DLDI_INTERFACE {
     bool (*clearStatus)(void);
     bool (*shutdown)(void);
 } DLDI_INTERFACE;
-
-extern DLDI_INTERFACE _io_dldi_stub;
 
 #endif // LIBNDS_NDS_ARM9_DLDI_H__

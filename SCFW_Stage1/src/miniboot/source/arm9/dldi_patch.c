@@ -18,10 +18,10 @@
 
 static void dldi_relocate(DLDI_INTERFACE *io, void *targetAddress) {
     uint32_t offset;
-    uint8_t **address;
-    uint8_t *prevAddrStart;
-    uint8_t *prevAddrSpaceEnd;
-    uint8_t *prevAddrAllocEnd;
+    void **address;
+    void *prevAddrStart;
+    void *prevAddrSpaceEnd;
+    void *prevAddrAllocEnd;
 
     offset = (uint32_t) targetAddress - (uint32_t) io->dldiStart;
     prevAddrStart = io->dldiStart;
@@ -57,7 +57,7 @@ static void dldi_relocate(DLDI_INTERFACE *io, void *targetAddress) {
 
     // Fix all addresses with in the DLDI
     if (io->fixSectionsFlags & FIX_ALL) {
-        for (address = (uint8_t**) io->dldiStart; address < (uint8_t**) io->dldiEnd; address++) {
+        for (address = (void**) io->dldiStart; address < (void**) io->dldiEnd; address++) {
             if (prevAddrStart <= *address && *address < prevAddrAllocEnd)
                 *address += offset;
         }
@@ -65,7 +65,7 @@ static void dldi_relocate(DLDI_INTERFACE *io, void *targetAddress) {
 
     // Fix the interworking glue section
     if (io->fixSectionsFlags & FIX_GLUE) {
-        for (address = (uint8_t**) io->interworkStart; address < (uint8_t**) io->interworkEnd; address++) {
+        for (address = (void**) io->interworkStart; address < (void**) io->interworkEnd; address++) {
             if (prevAddrStart <= *address && *address < prevAddrAllocEnd)
                 *address += offset;
         }
@@ -73,7 +73,7 @@ static void dldi_relocate(DLDI_INTERFACE *io, void *targetAddress) {
 
     // Fix the global offset table section
     if (io->fixSectionsFlags & FIX_GOT) {
-        for (address = (uint8_t**) io->gotStart; address < (uint8_t**) io->gotEnd; address++) {
+        for (address = (void**) io->gotStart; address < (void**) io->gotEnd; address++) {
             if (prevAddrStart <= *address && *address < prevAddrSpaceEnd)
                 *address += offset;
         }
