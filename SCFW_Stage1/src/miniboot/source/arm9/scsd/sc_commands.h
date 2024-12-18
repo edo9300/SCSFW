@@ -12,16 +12,16 @@ extern "C" {
 
 void sc_change_mode(uint16_t mode);
 
-typedef enum SC_FLASH_COMMAND {
-	ERASE		= 0x80,
-	ERASE_BLOCK	= 0x30,
-	ERASE_CHIP	= 0x10,
-	PROGRAM		= 0xA0,
-	IDENTIFY	= 0x90,
-} SC_FLASH_COMMAND;
+typedef enum SUPERCARD_TYPE {
+    SC_SD = 0x00,
+    SC_LITE = 0x01,
+    SC_CF = 0x02,
+    SC_RUMBLE = (0x10 | SC_LITE),
+    UNK = ~SC_RUMBLE,
+} SUPERCARD_TYPE;
 
-void sc_send_command(SC_FLASH_COMMAND command);
 bool try_guess_lite(void);
+SUPERCARD_TYPE detect_supercard_type(void);
 
 #ifdef __cplusplus
 }
