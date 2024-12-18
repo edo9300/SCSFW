@@ -12,10 +12,6 @@ MEMORY {
 }
 
 SECTIONS {
-	/* === Constants === */
-	PROVIDE(__dldi_size = 16384);
-	__dldi_log2_size = LOG2CEIL(__dldi_size + 1) - 1;
-
 	/* === ITCM === */
 
 	/* Keep everything in one section to make objcopy work fine. */
@@ -24,10 +20,6 @@ SECTIONS {
 		*(.text .text.* .gnu.linkonce.t.*)
 		*(.rodata .rodata.* .gnu.linkonce.r.*)
 		*(.data .data.* .gnu.linkonce.d.*)
-		. = ALIGN(512);
-		__dldi_start = .;
-		*(.dldi .dldi.*)
-		. = __dldi_start + __dldi_size;
 		. = ALIGN(512);
 	} >ITCM AT>RAM
 
