@@ -49,7 +49,7 @@ int main() {
 	}
 
 	u32 kernel_size = f_size(&kernel);
-	if (kernel_size > 0x40000) {
+	if (kernel_size > 0x02000000) {
 		tryAgain();
 	}
 	u32 total_bytes = 0;
