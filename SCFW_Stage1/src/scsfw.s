@@ -76,6 +76,8 @@ entrypoint:
 	.word (sc_lite_dldi_end - sc_lite_dldi)
 	.word scsd_dldi
 	.word (scsd_dldi_end - scsd_dldi)
+	.word sccf_dldi
+	.word (sccf_dldi_end - sccf_dldi)
 
 .set supercard_switch_mode_offset, 0x9000
 real_entrypoint:
@@ -204,4 +206,9 @@ sc_lite_dldi_end:
 scsd_dldi:
 .incbin "../../dldi/scsd.dldi"
 scsd_dldi_end:
+
+.balign 4, 0xff
+sccf_dldi:
+.incbin "../../dldi/sccf.dldi"
+sccf_dldi_end:
 

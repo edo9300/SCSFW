@@ -35,7 +35,8 @@ take care of loading the embedded `SCFW_Stage2_NDS.NDS` (currently defaulting to
 [nds-hbmenu](https://github.com/devkitPro/nds-hb-menu), that also has support for hotkeys by saving
 the configs on the supercard itself)
 from the flash in a clean environment, also dldi patching it appropriately
-depending on the type of SuperCard used, using either `scsd.dldi` or `sc-lite.dldi` from the dldi folder  
+depending on the type of SuperCard used, using either `scsd.dldi`, `sc-lite.dldi` (Rumble and Lite) or
+`scfw.dldi` from the dldi folder  
 If the the SuperCard is launched in NDS mode with another game cart inserted in the slot1 (via flashme),
 it will store this information at the beginning of its internal ram, so that other applications can use it:
 ```

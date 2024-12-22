@@ -58,6 +58,8 @@ typedef struct SCSFW_PARAMETERS {
 	unsigned int sc_lite_dldi_size;
 	unsigned int scsd_dldi;
 	unsigned int scsd_dldi_size;
+	unsigned int sccf_dldi;
+	unsigned int sccf_dldi_size;
 } SCSFW_PARAMETERS;
 
 SCSFW_PARAMETERS parameters;
@@ -80,6 +82,7 @@ void findSCSFWParameters(SCSFW_PARAMETERS* params) {
 	params->nds_rom += 0x40000;
 	params->sc_lite_dldi += 0x40000;
 	params->scsd_dldi += 0x40000;
+	params->sccf_dldi += 0x40000;
 }
 
 #define SECURE_AREA_FROM_FW (*((volatile uint32_t*)0x2000000))
@@ -165,6 +168,8 @@ int main(void) {
     dprintf("parameters.scsd_dldi: 0x%X\n", parameters.scsd_dldi);
     dprintf("parameters.sc_lite_dldi_size: 0x%X\n", parameters.sc_lite_dldi_size);
     dprintf("parameters.sc_lite_dldi: 0x%X\n", parameters.sc_lite_dldi);
+    dprintf("parameters.sccf_dldi_size: 0x%X\n", parameters.sccf_dldi_size);
+    dprintf("parameters.sccf_dldi: 0x%X\n", parameters.sccf_dldi);
     dprintf("ARM7 sync");
     for (int i = 1; i <= 16; i++) {
         dprintf(".");
@@ -196,9 +201,13 @@ int main(void) {
     // Create a copy of the DLDI driver in VRAM before initializing it.
     // We'll make use of this copy for patching the ARM9 binary later.
     dprintf("reading dldi... ");
-	if(try_guess_lite()) {
+	SUPERCARD_TYPE type = detect_supercard_type();
+	if(type & SC_LITE) {
 		dprintf("for sclite...\n");
 		__aeabi_memcpy4(DLDI_BACKUP, (void*)&GBA_BUS_U8[parameters.sc_lite_dldi], parameters.sc_lite_dldi_size);
+	} else if (type == SC_CF) {
+		dprintf("for sccf...\n");
+		__aeabi_memcpy4(DLDI_BACKUP, (void*)&GBA_BUS_U8[parameters.sccf_dldi], parameters.sccf_dldi_size);
 	} else {
 		dprintf("for scsd...\n");
 		__aeabi_memcpy4(DLDI_BACKUP, (void*)&GBA_BUS_U8[parameters.scsd_dldi], parameters.scsd_dldi_size);
@@ -209,7 +218,7 @@ int main(void) {
     checkErrorFatFs("Could not mount FAT filesystem", f_mount(&fs, "", 1));
     dprintf("OK\n");
     checkErrorFatFs("Could not find BOOT.NDS", f_open(&fp, executable_path, FA_READ));
-    dprintf("BOOT.NDS found.\n");
+    dprintf("BOOT.NDS found.\n"	);
 
     // Read the .nds file header.
     checkErrorFatFs("Could not read BOOT.NDS", f_read(&fp, NDS_HEADER, sizeof(nds_header_t), &bytes_read));
