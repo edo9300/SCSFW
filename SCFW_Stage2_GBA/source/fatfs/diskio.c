@@ -9,35 +9,43 @@
 
 #include "ff.h"			/* Obtains integer types */
 #include "diskio.h"		/* Declarations of disk functions */
-#include "../new_scsdio.h"
+#include "dldi.h"
 
-static bool initialized = false;
-static bool drive_present = false;
+static DSTATUS status = STA_NOINIT;
 
-DSTATUS disk_status (BYTE pdrv)
-{
-	if(!drive_present)
-		return STA_NODISK;
-	if(!initialized)
-		return STA_NOINIT;
-	return 0;
+DSTATUS disk_status(BYTE pdrv) {
+	return status;
 }
 
-DSTATUS disk_initialize (BYTE pdrv)
-{
-    sc_mode(en_sdram + en_sdcard);
-	if(!MemoryCard_IsInserted())
-		return STA_NODISK;
-	drive_present = true;
-	if(!init_sd())
-		return STA_NOINIT;
-	initialized = true;
-	return 0;
+DSTATUS disk_initialize(BYTE pdrv) {
+	if (!_io_dldi_stub.startup())
+		status = STA_NOINIT;
+	else if (!_io_dldi_stub.isInserted())
+		status = STA_NODISK;
+	else
+		status = 0;
+
+	return status;
 }
 
-DRESULT disk_read(BYTE pdrv, BYTE *buff, LBA_t sector, UINT count)
-{
-    sc_mode(en_sdram + en_sdcard);
-    ReadSector(buff,sector,count);
+DRESULT disk_read (
+	BYTE pdrv,		/* Physical drive nmuber to identify the drive */
+	BYTE *buff,		/* Data buffer to store read data */
+	LBA_t sector,	/* Start sector in LBA */
+	UINT count		/* Number of sectors to read */
+) {
+	if (!_io_dldi_stub.readSectors(sector, count, buff))
+		return RES_ERROR;
 	return RES_OK;
+}
+
+DRESULT disk_ioctl (
+	BYTE pdrv,		/* Physical drive nmuber (0..) */
+	BYTE cmd,		/* Control code */
+	void *buff		/* Buffer to send/receive control data */
+) {
+	if (cmd == CTRL_SYNC)
+		return RES_OK;
+
+	return RES_PARERR;
 }

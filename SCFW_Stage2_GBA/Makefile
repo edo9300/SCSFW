@@ -66,15 +66,15 @@ INCLUDEFLAGS	:= $(foreach path,$(INCLUDEDIRS),-I$(path)) \
 LIBDIRSFLAGS	:= $(foreach path,$(LIBDIRS),-L$(path)/lib)
 
 ASFLAGS		+= -x assembler-with-cpp $(DEFINES) $(WF_ARCH_CFLAGS) \
-		   $(INCLUDEFLAGS) -ffunction-sections -fdata-sections
+		   $(INCLUDEFLAGS) -ffunction-sections -fdata-sections -mthumb -mthumb-interwork
 
 CFLAGS		+= -std=gnu2x $(WARNFLAGS) $(DEFINES) $(WF_ARCH_CFLAGS) \
-		   $(INCLUDEFLAGS) -ffunction-sections -fdata-sections -mthumb -Os
+		   $(INCLUDEFLAGS) -ffunction-sections -fdata-sections -mthumb -mthumb-interwork -Os
 
 #workaround, only the scsd driver requires arm, due to inline asm, so force it as such
 
 CXXFLAGS	+= $(WARNFLAGS) $(DEFINES) $(WF_ARCH_CFLAGS) \
-		   $(INCLUDEFLAGS) -ffunction-sections -fdata-sections -fno-rtti -fno-exceptions -marm -Os
+		   $(INCLUDEFLAGS) -ffunction-sections -fdata-sections -fno-rtti -fno-exceptions -mthumb -mthumb-interwork -Os
 
 LDFLAGS		:= $(LIBDIRSFLAGS) $(DEFINES) -Wl,-Map,$(MAP) -Wl,--gc-sections \
 		   $(WF_ARCH_LDFLAGS) $(LIBS)
