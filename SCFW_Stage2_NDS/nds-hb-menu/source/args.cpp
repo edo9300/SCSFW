@@ -21,65 +21,75 @@
 
 ------------------------------------------------------------------*/
 
+#include <array>
+#include <cstring>
 #include <dirent.h>
-#include <limits.h>
-#include <stdio.h>
 #include <string>
-#include <string.h>
 #include <unistd.h>
 #include <utility>
 #include <vector>
 
 #include "args.h"
 
-using namespace std;
+using namespace std::string_view_literals;
 
-static const string NDS_EXT = ".nds";
-static const string SRLDR_EXT = ".srldr";
-static const string ARG_EXT = ".argv";
-static const string EXT_EXT = ".ext";
-static const char EXT_DIR[] = "/nds";
-static const char SEPARATORS[] = "\n\r\t ";
+static constexpr auto NDS_EXT = ".nds"sv;
+static constexpr auto SRLDR_EXT = ".srldr"sv;
+static constexpr auto ARG_EXT = ".argv"sv;
+static constexpr auto EXT_EXT = ".ext"sv;
+static constexpr auto EXT_DIR = "/nds"sv;
+static constexpr auto SEPARATORS = "\n\r\t "sv;
 
 /* Checks if s1 ends with s2, ignoring case.
    Returns true if it does, false otherwise.
  */
-static bool strCaseEnd(const string& s1, const string& s2) {
+static bool strCaseEnd(std::string_view s1, std::string_view s2) {
 	return (s1.size() >= s2.size() &&
-			strcasecmp(s1.c_str() + s1.size() - s2.size(), s2.c_str()) == 0);
+			strcasecmp(s1.data() + s1.size() - s2.size(), s2.data()) == 0);
 }
 
 /* Parses the contents of the file given by filename into argarray. Arguments
    are tokenized based on whitespace.
  */
-static bool parseArgFileAll(const string& filename, vector<string>& argarray) {
-	FILE *argfile = fopen(filename.c_str(), "rb");
-	if (!argfile) {
+static bool parseArgFileAll(std::string_view filename, std::vector<std::string>& argarray) {
+	FILE* argfile = fopen(filename.data(), "rb");
+	if(!argfile) {
 		return false;
 	}
 
-	char *line = NULL;
+	char* line = nullptr;
 	size_t lineSize = 0;
-	while (__getline(&line, &lineSize, argfile) >= 0) {
+	int len = 0;
+	while(((len = __getline(&line, &lineSize, argfile)) >= 0)) {
+		std::string_view line_sv{ line, static_cast<std::string_view::size_type>(len) };
 		// Find comment and end string there
-		char *pstr = strchr(line, '#');
-		if (pstr) {
-			*pstr = '\0';
+		auto pos = line_sv.find_first_of('#');
+		if(pos != std::string_view::npos) {
+			line_sv.remove_suffix(pos - line_sv.size());
+		}
+		
+		pos = line_sv.find_first_not_of(SEPARATORS);
+		if(pos != std::string_view::npos) {
+			line_sv.remove_prefix(pos);
+		}
+		
+		while((pos = line_sv.find_first_of(SEPARATORS)) != std::string_view::npos) {
+			auto substr = line_sv.substr(0, pos);
+			argarray.emplace_back(substr);
+			pos = line_sv.find_first_not_of(SEPARATORS, pos);
+			if(pos == std::string_view::npos) {
+				line_sv = "";
+				break;
+			}
+			line_sv.remove_prefix(pos);
 		}
 
-		// Tokenize arguments
-		char *saveptr;
-		pstr = strtok_r(line, SEPARATORS, &saveptr);
-
-		while (pstr) {
-			argarray.emplace_back(pstr);
-			pstr = strtok_r(NULL, SEPARATORS, &saveptr);
+		if(line_sv.size()) {
+			argarray.emplace_back(line_sv);
 		}
 	}
 
-	if (line) {
-		free(line);
-	}
+	free(line);
 
 	fclose(argfile);
 
@@ -89,39 +99,41 @@ static bool parseArgFileAll(const string& filename, vector<string>& argarray) {
 /* Parses the argument file given by filename and returns the NDS file that it
  * points to.
  */
-static bool parseArgFileNds(const std::string& filename, std::string& ndsPath) {
+static bool parseArgFileNds(std::string_view filename, std::string& ndsPath) {
 	bool success = false;
-	FILE *argfile = fopen(filename.c_str(), "rb");
-	if (!argfile) {
+	FILE* argfile = fopen(filename.data(), "rb");
+	if(!argfile) {
 		return false;
 	}
 
-	char *line = NULL;
+	char* line = nullptr;
 	size_t lineSize = 0;
-	while (__getline(&line, &lineSize, argfile) >= 0) {
-		char *pstr = NULL;
-
+	int len = 0;
+	while((len = __getline(&line, &lineSize, argfile)) >= 0) {
+		std::string_view line_sv{ line, static_cast<std::string_view::size_type>(len) };
 		// Find comment and end string there
-		pstr = strchr(line, '#');
-		if (pstr) {
-			*pstr = '\0';
+		auto pos = line_sv.find_first_of('#');
+		if(pos != std::string_view::npos) {
+			line_sv.remove_suffix(pos - line_sv.size());
 		}
 
-		// Tokenize arguments
-		char *saveptr;
-		pstr = strtok_r(line, SEPARATORS, &saveptr);
+		pos = line_sv.find_first_not_of(SEPARATORS);
+		if(pos != std::string_view::npos) {
+			line_sv.remove_prefix(pos);
+		}
 
-		if (pstr) {
-			// Only want the first token, which should be the NDS file name
-			ndsPath = pstr;
+		pos = line_sv.find_first_of(SEPARATORS);
+		if(pos != std::string_view::npos) {
+			line_sv = line_sv.substr(0, pos);
+		}
+		if(line_sv.size()) {
 			success = true;
+			ndsPath = line_sv;
 			break;
 		}
 	}
 
-	if (line) {
-		free(line);
-	}
+	free(line);
 
 	fclose(argfile);
 
@@ -129,21 +141,21 @@ static bool parseArgFileNds(const std::string& filename, std::string& ndsPath) {
 }
 
 /* Converts a plain filename into an absolute path. If it's already an absolute
- * path, it is returned as-is. If basePath is NULL, the current working directory
+ * path, it is returned as-is. If basePath is nullptr, the current working directory
  * is used.
  * Returns true on success, false on failure.
  */
-bool toAbsPath(const string& filename, const char* basePath, string& filePath) {
+bool toAbsPath(std::string_view filename, std::string_view basePath, std::string& filePath) {
 	// Copy existing absolute or empty paths
-	if (filename.size() == 0 || filename[0] == '/' || (filename.size() > (sizeof("fat:/") - 1) && memcmp("fat:/", filename.data(), sizeof("fat:/") - 1) == 0)) {
+	if(filename.empty() || filename.starts_with('/') || filename.starts_with("fat:/")) {
 		filePath = filename;
 		return true;
 	}
 
-	if (basePath == NULL) {
+	if(basePath.empty()) {
 		// Get current working directory (uses C-strings)
-		vector<char> cwd(PATH_MAX);
-		if (getcwd (cwd.data(), cwd.size()) == NULL) {
+		std::array<char,PATH_MAX> cwd;
+		if(getcwd(cwd.data(), cwd.size()) == nullptr) {
 			// Path was too long, abort
 			return false;
 		}
@@ -155,7 +167,7 @@ bool toAbsPath(const string& filename, const char* basePath, string& filePath) {
 	}
 
 	// Ensure there's a path separator
-	if (filePath.back() != '/') {
+	if(!filePath.ends_with('/')) {
 		filePath += '/';
 	}
 
@@ -169,22 +181,22 @@ bool toAbsPath(const string& filename, const char* basePath, string& filePath) {
  * handler.
  * Returns true on success, false on failure
  */
-static bool toExtPath(const string& dataFilePath, string& extFilePath) {
+static bool toExtPath(std::string_view dataFilePath, std::string& extFilePath) {
 	// Figure out what the file extension is
-	size_t extPos = dataFilePath.rfind('.');
-	if (extPos == string::npos) {
+	auto extPos = dataFilePath.rfind('.');
+	if(extPos == std::string::npos) {
 		return false;
 	}
 
 	extPos += 1;
-	if (extPos >= dataFilePath.size()) {
+	if(extPos >= dataFilePath.size()) {
 		return false;
 	}
 
 	// Construct handler path from extension. Handlers are in the EXT_DIR and
 	// end with EXT_EXT.
-	const string ext = dataFilePath.substr(extPos);
-	if (!toAbsPath(ext, EXT_DIR, extFilePath)) {
+	auto ext = dataFilePath.substr(extPos);
+	if(!toAbsPath(ext, EXT_DIR, extFilePath)) {
 		return false;
 	}
 
@@ -193,20 +205,20 @@ static bool toExtPath(const string& dataFilePath, string& extFilePath) {
 	return true;
 }
 
-bool argsNdsPath(const std::string& filePath, std::string& ndsPath) {
-	if (strCaseEnd(filePath, NDS_EXT)) {
+bool argsNdsPath(std::string_view filePath, std::string& ndsPath) {
+	if(strCaseEnd(filePath, NDS_EXT)) {
 		ndsPath = filePath;
 		return true;
-	} else	if (strCaseEnd(filePath, ARG_EXT)) {
+	} else	if(strCaseEnd(filePath, ARG_EXT)) {
 		return parseArgFileNds(filePath, ndsPath);
 	} else {
 		// This is a data file associated with a handler NDS by an ext file
-		string extPath;
-		if (!toExtPath(filePath, extPath)) {
+		std::string extPath;
+		if(!toExtPath(filePath, extPath)) {
 			return false;
 		}
-		string ndsRelPath;
-		if (!parseArgFileNds(extPath, ndsRelPath)) {
+		std::string ndsRelPath;
+		if(!parseArgFileNds(extPath, ndsRelPath)) {
 			return false;
 		}
 		// Handler is in EXT_DIR
@@ -216,76 +228,74 @@ bool argsNdsPath(const std::string& filePath, std::string& ndsPath) {
 	return false;
 }
 
-bool argsFillArray(const string& filePath, vector<string>& argarray) {
+bool argsFillArray(std::string_view filePath, std::vector<std::string>& argarray) {
 	// Ensure argarray is empty
 	argarray.clear();
 
-	if (strCaseEnd(filePath, NDS_EXT)) {
-		string absPath;
-		if (!toAbsPath(filePath, NULL, absPath)) {
+	if(strCaseEnd(filePath, NDS_EXT)) {
+		std::string absPath;
+		if(!toAbsPath(filePath, {}, absPath)) {
 			return false;
 		}
-		argarray.push_back(move(absPath));
-	} else if (strCaseEnd(filePath, ARG_EXT)) {
-		if (!parseArgFileAll(filePath, argarray)) {
+		argarray.push_back(std::move(absPath));
+	} else if(strCaseEnd(filePath, ARG_EXT)) {
+		if(!parseArgFileAll(filePath, argarray)) {
 			return false;
 		}
 		// Ensure argv[0] is absolute path
-		string absPath;
-		if (!toAbsPath(argarray[0], NULL, absPath)) {
+		std::string absPath;
+		if(!toAbsPath(argarray[0], {}, absPath)) {
 			return false;
 		}
-		argarray[0] = absPath;
+		std::swap(argarray[0], absPath);
 	} else {
 		// This is a data file associated with a handler NDS by an ext file
-		string extPath;
+		std::string extPath;
 
-		if (!toExtPath(filePath, extPath)) {
+		if(!toExtPath(filePath, extPath)) {
 			return false;
 		}
 
 		// Read the arg file for the extension handler
-		if (!parseArgFileAll(extPath, argarray)) {
+		if(!parseArgFileAll(extPath, argarray)) {
 			return false;
 		}
 
 		// Extension handler relative path is relative to EXT_DIR, not CWD
-		string absPath;
-		if (!toAbsPath(argarray[0], EXT_DIR, absPath)) {
+		std::string absPath;
+		if(!toAbsPath(argarray[0], EXT_DIR, absPath)) {
 			return false;
 		}
 		argarray[0] = absPath;
 
 		// Add the data filename to the end. Its path is relative to CWD.
-		if (!toAbsPath(filePath, NULL, absPath)) {
+		if(!toAbsPath(filePath, {}, absPath)) {
 			return false;
 		}
-		argarray.push_back(move(absPath));
+		argarray.push_back(std::move(absPath));
 	}
 
 	return argarray.size() > 0 && strCaseEnd(argarray[0], NDS_EXT);
 }
 
-vector<string> argsGetExtensionList() {
-	vector<string> extensionList;
-
+std::vector<std::string> argsGetExtensionList() {
 	// Always supported files: NDS binaries and predefined argument lists
-	extensionList.push_back(NDS_EXT);
-	extensionList.push_back(ARG_EXT);
+	std::vector extensionList{std::string{NDS_EXT},std::string{ARG_EXT}};
 
 	// Get a list of extension files: argument lists associated with a file type
-	DIR *dir = opendir (EXT_DIR);
-	if (dir) {
-		for (struct dirent* dirent = readdir(dir); dirent != NULL; dirent = readdir(dir)) {
+	auto* dir = opendir(EXT_DIR.data());
+	if(dir) {
+		for(auto* dirent = readdir(dir); dirent != nullptr; dirent = readdir(dir)) {
 			// Add the name component of all files ending with EXT_EXT to the list
-			if (dirent->d_type != DT_REG) {
+			if(dirent->d_type != DT_REG) {
 				continue;
 			}
+			
+			std::string_view name{dirent->d_name};
 
-			if (dirent->d_name[0] != '.' && strCaseEnd(dirent->d_name, EXT_EXT)) {
-				size_t extPos = strlen(dirent->d_name) - EXT_EXT.size();
-				dirent->d_name[extPos] = '\0';
-				extensionList.push_back(dirent->d_name);
+			if(!name.starts_with('.') && strCaseEnd(name, EXT_EXT)) {
+				name.remove_suffix(EXT_EXT.size());
+				extensionList.emplace_back(name);
 			}
 		}
 		closedir(dir);

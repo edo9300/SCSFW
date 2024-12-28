@@ -32,18 +32,18 @@
  * current working directory.
  * Returns true on success, false on failure.
  */
-bool argsNdsPath(const std::string& filePath, std::string& ndsPath);
+bool argsNdsPath(std::string_view filePath, std::string& ndsPath);
 
 /* Convert a file path of any type into an argument array by filling the array
  * that is passed in. The first argument will be the full path to an NDS file.
  * Returns true on success, false on failure.
  */
-bool argsFillArray(const std::string& filePath, std::vector<std::string>& argarray);
+bool argsFillArray(std::string_view filePath, std::vector<std::string>& argarray);
 
 /* Return a list of all file extensions that can be browsed and opened.
  */
 std::vector<std::string> argsGetExtensionList();
 
-bool toAbsPath(const std::string& filename, const char* basePath, std::string& filePath);
+bool toAbsPath(std::string_view filename, std::string_view basePath, std::string& filePath);
 
 #endif // ARGS_H

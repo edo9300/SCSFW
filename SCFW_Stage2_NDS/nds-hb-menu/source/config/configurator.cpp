@@ -1,12 +1,14 @@
 
 #define _GNU_SOURCE         /* See feature_test_macros(7) */
-#include <string.h> // basename
-#include "configurator.h"
-#include "../file_browse.h"
-#include "../args.h"
-#include "../iconTitle.h"
-#include <nds.h>
+#include <cstring> // basename
 #include <sys/stat.h>
+
+#include <nds.h>
+
+#include "configurator.h"
+#include "../args.h"
+#include "../file_browse.h"
+#include "../iconTitle.h"
 
 char* getEntryPath(int off, struct SCSFW_CONFIGS* configs) {
 	switch(off) {
@@ -206,7 +208,7 @@ void configMenu(struct SCSFW_CONFIGS* configs) {
 				} else {
 					auto entry = browseForFile({".nds", ".srldr"});
 					std::string absPath;
-					toAbsPath(entry, nullptr, absPath);
+					toAbsPath(entry, {}, absPath);
 					if(absPath.size() >= sizeof(ENTRY::path)) {
 						iprintf("\x1b[2J");
 						printErrorAndWaitForA("File path too long.");

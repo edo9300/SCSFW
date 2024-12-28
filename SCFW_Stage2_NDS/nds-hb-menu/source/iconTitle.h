@@ -21,6 +21,6 @@
 ------------------------------------------------------------------*/
 #include <string>
 
-void iconTitleInit (void);
-void iconTitleUpdate (int isdir, const std::string& name);
-void clearIconTitle (void);
+void iconTitleInit();
+void iconTitleUpdate(int isdir, std::string_view name);
+void clearIconTitle();

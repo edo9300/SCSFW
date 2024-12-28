@@ -20,13 +20,8 @@
 
 ------------------------------------------------------------------*/
 #include <nds.h>
-#include <stdio.h>
+#include <cstdio>
 #include <fat.h>
-#include <sys/stat.h>
-#include <limits.h>
-
-#include <string.h>
-#include <unistd.h>
 
 #include "args.h"
 #include "file_browse.h"
@@ -38,12 +33,8 @@
 #include "scsd/sc_commands.h"
 
 
-using namespace std;
-
-//---------------------------------------------------------------------------------
-void stop (void) {
-//---------------------------------------------------------------------------------
-	while (1) {
+[[noreturn]] void stop() {
+	while(1) {
 		swiWaitForVBlank();
 	}
 }
@@ -58,7 +49,7 @@ void initConsole() {
 	// Subscreen as a console
 	videoSetModeSub(MODE_0_2D);
 	vramSetBankH(VRAM_H_SUB_BG);
-	consoleInit(NULL, 0, BgType_Text4bpp, BgSize_T_256x256, 15, 0, false, true);
+	consoleInit(nullptr, 0, BgType_Text4bpp, BgSize_T_256x256, 15, 0, false, true);
 }
 
 void initTopScreen() {
@@ -67,29 +58,11 @@ void initTopScreen() {
 	iconTitleInit();
 }
 
-//---------------------------------------------------------------------------------
-int main(int argc, char **argv) {
-//---------------------------------------------------------------------------------
+static std::string_view getExecPath(const SCSFW_CONFIGS& confs) {
+	static char executable_path[128];
 
-	// overwrite reboot stub identifier
-	// so tapping power on DSi returns to DSi menu
-	extern char *fake_heap_end;
-	*fake_heap_end = 0;
-	
-	if (!fatInitDefault()) {
-		initTopScreen();
-		initConsole();
-		iprintf ("fatinitDefault failed!\n");
-		stop();
-	}
-	
-	SCSFW_CONFIGS confs;
-	char executable_path[128];
-	
-	read_configs(&confs);
-	
 	scanKeys();
-	
+
 	switch(keysHeld() & (KEY_A | KEY_B | KEY_X | KEY_Y | KEY_UP | KEY_DOWN | KEY_LEFT | KEY_RIGHT)) {
 		case KEY_A | KEY_B:
 			memcpy(executable_path, "CONFIG", sizeof("CONFIG"));
@@ -114,72 +87,82 @@ int main(int argc, char **argv) {
 			memcpy(executable_path, confs.hk_none.path, sizeof(confs.hk_none.path));
 			break;
 	}
-	
+
 	executable_path[127] = 0;
+	return executable_path;
+}
+
+int main(int argc, char** argv) {
+	// overwrite reboot stub identifier
+	// so tapping power on DSi returns to DSi menu
+	extern char* fake_heap_end;
+	*fake_heap_end = 0;
+
+	if(!fatInitDefault()) {
+		initTopScreen();
+		initConsole();
+		iprintf("fatinitDefault failed!\n");
+		stop();
+	}
+
+	SCSFW_CONFIGS confs;
+	read_configs(&confs);
 	
-	if (memcmp(executable_path, "fat:/", sizeof("fat:/") - 1) == 0) {
-		std::vector<string> argarray;
+	const auto executable_path = getExecPath(confs);
+
+	if(executable_path.starts_with("fat:/")) {
+		std::vector<std::string> argarray;
 		int err = 10;
-		std::vector<const char*> c_args;
 		if(argsFillArray(executable_path, argarray)) {
-			for (const auto& arg: argarray) {
-				c_args.push_back(arg.c_str());
-			}
-			err = runNdsFile(c_args[0], c_args.size(), &c_args[0]);
+			err = runNdsFile(argarray);
 		}
 		initConsole();
 		initTopScreen();
-		iprintf("Failed to start\n%s.\nError %i.\nPress START to continue boot.\nYou can change the autoboot\nsettings by holding A+B on\nlaunch", c_args[0], err);
-		while (1) {
+		iprintf("Failed to start\n%s.\n"
+				"Error %i.\n"
+				"Press START to continue boot.\n"
+				"You can change the autoboot\n"
+				"settings by holding A+B on\n"
+				"launch", executable_path.data(), err);
+		while(1) {
 			swiWaitForVBlank();
 			scanKeys();
-			if ((keysHeld() & KEY_START)) break;
+			if((keysHeld() & KEY_START)) break;
 		}
 	}
-	
-	initConsole();
-	initTopScreen();	
-	
-	keysSetRepeat(25,5);
 
-	if(memcmp(executable_path, "CONFIG", sizeof("CONFIG") - 1) == 0) {
+	initConsole();
+	initTopScreen();
+
+	keysSetRepeat(25, 5);
+
+	if(executable_path == "CONFIG") {
 		configMenu(&confs);
 	}
 
 	chdir("fat:/");
 
-	vector<string> extensionList = argsGetExtensionList();
+	const auto extensionList = argsGetExtensionList();
 
 	while(1) {
 
-		string filename = browseForFile(extensionList);
+		auto filename = browseForFile(extensionList);
 
 		// Construct a command line
-		vector<string> argarray;
-		if (!argsFillArray(filename, argarray)) {
+		std::vector<std::string> argarray;
+		if(!argsFillArray(filename, argarray)) {
 			iprintf("Invalid NDS or arg file selected\n");
 		} else {
 			iprintf("Running %s with %d parameters\n", argarray[0].c_str(), argarray.size());
-
-			// Make a copy of argarray using C strings, for the sake of runNdsFile
-			vector<const char*> c_args;
-			for (const auto& arg: argarray) {
-				c_args.push_back(arg.c_str());
-			}
-
-			// Try to run the NDS file with the given arguments
-			int err = runNdsFile(c_args[0], c_args.size(), &c_args[0]);
+			auto err = runNdsFile(argarray);
 			iprintf("Start failed. Error %i\n", err);
 		}
 
-		argarray.clear();
-
-		while (1) {
+		while(1) {
 			swiWaitForVBlank();
 			scanKeys();
-			if (!(keysHeld() & KEY_A)) break;
+			if(!(keysHeld() & KEY_A)) break;
 		}
-
 	}
 
 	return 0;

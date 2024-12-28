@@ -25,7 +25,7 @@
 #include <string>
 #include <vector>
 
-std::string browseForFile (const std::vector<std::string>& extensionList);
+std::string browseForFile(const std::vector<std::string>& extensionList);
 
 #define SCREEN_COLS 32
 
