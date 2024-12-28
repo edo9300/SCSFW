@@ -106,21 +106,22 @@ int main() {
 	}
 	uint32_t total_bytes = 0;
 	UINT bytes = 0;
-	do {
+	while(1) {
 		if(f_read(&kernel, filebuf, (UINT)sizeof(filebuf), &bytes) != FR_OK) {
 			setErrorScreenColor(RGB8(255, 255, 0));
 			tryAgain();
 		}
+		if(bytes == 0)
+			break;
 		sc_change_mode(en_sdram + en_write);
 		tonccpy((void*)&GBA_ROM[total_bytes >> 2], filebuf, bytes);
-		if (GBA_ROM[(0 + total_bytes) >> 2] != *(volatile uint32_t*) &filebuf[0] ||
-			GBA_ROM[((bytes - 1) + total_bytes) >> 2] != *(volatile uint32_t*) &filebuf[bytes - 1]) {
+		if (GBA_ROM[(0 + total_bytes) >> 2] != *(volatile uint32_t*) &filebuf[0]) {
 			setErrorScreenColor(RGB8(125, 125, 125));
 			tryAgain();
 		}
 		sc_change_mode(en_sdram + en_sdcard);
 		total_bytes += bytes;
-	} while (bytes);
+	}
 	
 	if(kernel_size != total_bytes) {
 		setErrorScreenColor(RGB8(0, 0, 255));
