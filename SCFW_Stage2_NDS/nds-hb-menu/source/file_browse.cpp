@@ -196,7 +196,7 @@ std::string browseForFile(const std::vector<std::string>& extensionList) {
 				iprintf("Entering directory\n");
 				// Enter selected directory
 				chdir(entry.name.data());
-				getDirectoryContents(dirContents, {});
+				getDirectoryContents(dirContents, extensionList);
 				screenOffset = 0;
 				fileOffset = 0;
 				showDirectoryContents(dirContents, screenOffset);
@@ -211,7 +211,7 @@ std::string browseForFile(const std::vector<std::string>& extensionList) {
 		if(pressed & KEY_B) {
 			// Go up a directory
 			chdir("..");
-			getDirectoryContents(dirContents, {});
+			getDirectoryContents(dirContents, extensionList);
 			screenOffset = 0;
 			fileOffset = 0;
 			showDirectoryContents(dirContents, screenOffset);
