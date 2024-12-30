@@ -22,6 +22,7 @@ typedef enum SUPERCARD_TYPE {
 
 bool try_guess_lite(void);
 SUPERCARD_TYPE detect_supercard_type(void);
+void sc_flash_rw_enable(SUPERCARD_TYPE supercardType);
 
 #ifdef __cplusplus
 }

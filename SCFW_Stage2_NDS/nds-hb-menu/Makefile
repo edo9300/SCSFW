@@ -78,7 +78,7 @@ CFILES		:=	$(foreach dir,$(SOURCES),$(notdir $(wildcard $(dir)/*.c)))
 CPPFILES	:=	$(foreach dir,$(SOURCES),$(notdir $(wildcard $(dir)/*.cpp)))
 PNGFILES	:=	$(foreach dir,$(GRAPHICS),$(notdir $(wildcard $(dir)/*.png)))
 SFILES		:=	$(foreach dir,$(SOURCES),$(notdir $(wildcard $(dir)/*.s)))
-BINFILES	:=	load.bin bootstub.bin exceptionstub.bin
+BINFILES	:=	load.bin exceptionstub.bin
 
 #---------------------------------------------------------------------------------
 # use CXX for linking C++ projects, CC for standard C
@@ -114,9 +114,9 @@ else
 	endif
 endif
 
-.PHONY: bootloader bootstub exceptionstub $(BUILD) clean
+.PHONY: bootloader exceptionstub $(BUILD) clean
 
-all:	bootloader bootstub exceptionstub $(BUILD)
+all:	bootloader exceptionstub $(BUILD)
 
 #---------------------------------------------------------------------------------
 $(BUILD):
@@ -128,7 +128,6 @@ clean:
 	@echo clean ...
 	@rm -fr $(BUILD) $(TARGET).elf $(TARGET).nds $(TARGET).arm9 data
 	@$(MAKE) -C bootloader clean
-	@$(MAKE) -C bootstub clean
 	@$(MAKE) -C nds-exception-stub clean
 
 data:
@@ -139,9 +138,6 @@ bootloader: data
 
 exceptionstub: data
 	@$(MAKE) -C nds-exception-stub STUBBIN=$(CURDIR)/data/exceptionstub.bin
-
-bootstub: data
-	@$(MAKE) -C bootstub
 
 #---------------------------------------------------------------------------------
 else

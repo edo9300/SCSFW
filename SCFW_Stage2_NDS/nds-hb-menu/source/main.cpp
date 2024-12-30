@@ -93,11 +93,6 @@ static std::string_view getExecPath(const SCSFW_CONFIGS& confs) {
 }
 
 int main(int argc, char** argv) {
-	// overwrite reboot stub identifier
-	// so tapping power on DSi returns to DSi menu
-	extern char* fake_heap_end;
-	*fake_heap_end = 0;
-
 	if(!fatInitDefault()) {
 		initTopScreen();
 		initConsole();

@@ -157,6 +157,7 @@ int main(void) {
 #endif
 #endif
 	sysSetCartOwner(true);
+	SUPERCARD_TYPE type = detect_supercard_type();
 	findSCSFWParameters(&parameters);
     dprintf("parameters.miniboot_arm9_size: 0x%X\n", parameters.miniboot_arm9_size);
     dprintf("parameters.miniboot_arm9: 0x%X\n", parameters.miniboot_arm9);
@@ -179,8 +180,8 @@ int main(void) {
 
 	backupDecryptedHeaderAndSecureAreaAndHeaderToSCRam();
 
-    // Create a bootstub in memory, if one doesn't already exist.
-    if (DKA_BOOTSTUB->magic != DKA_BOOTSTUB_MAGIC) {
+    // Always a bootstub in memory.
+    if (true) {
         uint8_t *bootstub_loc = ((uint8_t*) DKA_BOOTSTUB) + sizeof(dka_bootstub_t);
         uint8_t *arm9_bin_loc = bootstub_loc + bootstub_size;
         uint8_t *arm7_bin_loc = arm9_bin_loc + parameters.miniboot_arm9_size;
@@ -201,7 +202,7 @@ int main(void) {
     // Create a copy of the DLDI driver in VRAM before initializing it.
     // We'll make use of this copy for patching the ARM9 binary later.
     dprintf("reading dldi... ");
-	SUPERCARD_TYPE type = detect_supercard_type();
+	sc_flash_rw_enable(type);
 	if(type & SC_LITE) {
 		dprintf("for sclite...\n");
 		__aeabi_memcpy4(DLDI_BACKUP, (void*)&GBA_BUS_U8[parameters.sc_lite_dldi], parameters.sc_lite_dldi_size);

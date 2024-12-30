@@ -44,7 +44,6 @@ Helpful information:
 #include "dldi_patcher.h"
 #include "card.h"
 #include "boot.h"
-#include "sdmmc.h"
 
 void arm7clearRAM();
 
@@ -290,23 +289,6 @@ void startBinary_ARM7 (void) {
 	VoidFn arm7code = *(VoidFn*)(0x2FFFE34);
 	arm7code();
 }
-#ifndef NO_SDMMC
-int sdmmc_sd_readsectors(u32 sector_no, u32 numsectors, void *out);
-//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-// Main function
-bool sdmmc_inserted() {
-	return true;
-}
-
-bool sdmmc_startup() {
-	sdmmc_controller_init(true);
-	return sdmmc_sdcard_init() == 0;
-}
-
-bool sdmmc_readsectors(u32 sector_no, u32 numsectors, void *out) {
-	return sdmmc_sdcard_readsectors(sector_no, numsectors, out) == 0;
-}
-#endif
 void mpu_reset();
 void mpu_reset_end();
 
@@ -314,13 +296,6 @@ int main (void) {
 #ifdef NO_DLDI
 	dsiSD = true;
 	dsiMode = true;
-#endif
-#ifndef NO_SDMMC
-	if (dsiSD && dsiMode) {
-		_io_dldi.fn_readSectors = sdmmc_readsectors;
-		_io_dldi.fn_isInserted = sdmmc_inserted;
-		_io_dldi.fn_startup = sdmmc_startup;
-	}
 #endif
 	u32 fileCluster = storedFileCluster;
 	// Init card
@@ -369,14 +344,6 @@ int main (void) {
 	}
 #endif
 
-#ifndef NO_SDMMC
-	if (dsiSD && dsiMode) {
-		sdmmc_controller_init(true);
-		*(vu16*)(SDMMC_BASE + REG_SDDATACTL32) &= 0xFFFDu;
-		*(vu16*)(SDMMC_BASE + REG_SDDATACTL) &= 0xFFDDu;
-		*(vu16*)(SDMMC_BASE + REG_SDBLKLEN32) = 0;
-	}
-#endif
 	// Pass command line arguments to loaded program
 	passArgs_ARM7();
 

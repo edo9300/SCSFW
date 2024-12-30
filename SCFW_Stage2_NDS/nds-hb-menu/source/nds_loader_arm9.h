@@ -54,7 +54,7 @@ extern "C++"
 }
 #endif
 
-bool installBootStub(bool havedsiSD);
+bool installBootStub();
 
 #ifdef __cplusplus
 }
