@@ -8,6 +8,7 @@
 
 #include "font.h"
 #include "tonccpy.h"
+#include "fileSelector.h"
 
 enum class SC_FLASH_COMMAND : u16 {
 	ERASE		= 0x80,
@@ -35,6 +36,7 @@ static PrintConsole btConsole;
 
 extern PrintConsole* currentConsole;
 
+char *firmwareFilename = NULL;
 
 static int bg;
 static int bgSub;
@@ -314,7 +316,7 @@ void vBlankHandler (void) {
 			PrintWithStat = true;
 		} else {
 			if (FileSuccess && (currentConsole != &btConsole)) {
-				iprintf("%lx \n\n\n\n\n\n\n\n\n     [FOUND FIRMWARE.FRM]", statData);
+				iprintf("%lx \n\n\n\n\n\n\n\n\n[FOUND %s]", statData, firmwareFilename);
 			} else {
 				iprintf("%lx \n", statData);
 			}
@@ -379,19 +381,22 @@ int main(void) {
 
 	if (fatInitDefault()) {
 		FILE *src = NULL;
-		if (access("/firmware.frm", F_OK) == 0) {
-			src = fopen("/firmware.frm", "rb");
-		} else if (access("/scfw/firmware.frm", F_OK) == 0) {
-			src = fopen("/scfw/firmware.frm", "rb");
-		}
+		consoleSelect(&btConsole);
+		consoleClear();
+		firmwareFilename = selectFirmware();
+		if(!firmwareFilename) {
+    		FileSuccess = false;
+		} else {
+		src = fopen(firmwareFilename, "rb");
+		consoleSelect(&tpConsole);
 		if (src) {
 			fseek(src, 0, SEEK_END);
 			firmSize = ftell(src);
 			fseek(src, 0, SEEK_SET);
 			if (firmSize <= get_max_firm_size()) {
-				printf("\n\n\n\n\n\n\n\n     [FOUND FIRMWARE.FRM]");
+				iprintf("\n\n\n\n\n\n\n\n[FOUND %s]",firmwareFilename);
 				consoleSelect(&btConsole);
-				printf("\n Reading FIRMWARE.FRM\n\n Please Wait...");
+				iprintf("\n Reading %s\n\n Please Wait...",firmwareFilename);
 				FileSuccess = fread((u8*)scfw_buffer, firmSize, 1, src) == 1;
 				fclose(src);
 				consoleClear();
@@ -400,6 +405,7 @@ int main(void) {
 			}
 		} else {
 			FileSuccess = false;
+		}
 		}
 	} else {
 		FileSuccess = false;
