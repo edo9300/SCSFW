@@ -76,7 +76,10 @@ char* selectFirmware(void) {
                 if (strcmp(pent->d_name, ".") == 0 || 
                     strcmp(pent->d_name, "..") == 0)
                     continue;
-                
+                // Skipping too long filename
+                if (strlen(pent->d_name) >= MAX_FILENAME_LEN)
+                    continue;
+                    
                 int isDir = (pent->d_type == DT_DIR);
                 // If it's a file, check extension
                 if (!isDir) {
@@ -255,15 +258,12 @@ char* selectFirmware(void) {
             // Print "Path: " label and current path on line 1 with scrolling
             currentConsole->cursorY = 1;
             currentConsole->cursorX = 0;
-            char pathDisplayBuf[PATH_DISPLAY_WIDTH + 10];
-            if (pathLen <= PATH_DISPLAY_WIDTH) {
-                snprintf(pathDisplayBuf, sizeof(pathDisplayBuf), "Path: %s", currentPath);
-            } else {
-                char pathScrollBuf[PATH_DISPLAY_WIDTH + 1];
-                strncpy(pathScrollBuf, &currentPath[pathScrollOffset], PATH_DISPLAY_WIDTH);
-                pathScrollBuf[PATH_DISPLAY_WIDTH] = '\0';
-                snprintf(pathDisplayBuf, sizeof(pathDisplayBuf), "Path: %s", pathScrollBuf);
-            }
+            char pathDisplayBuf[PATH_DISPLAY_WIDTH + 6 + 1];
+            char pathScrollBuf[PATH_DISPLAY_WIDTH + 1];
+            pathScrollOffset = (pathLen <= PATH_DISPLAY_WIDTH) ? 0 : pathScrollOffset;
+            strncpy(pathScrollBuf, &currentPath[pathScrollOffset], PATH_DISPLAY_WIDTH);
+            pathScrollBuf[PATH_DISPLAY_WIDTH] = '\0';
+            snprintf(pathDisplayBuf, sizeof(pathDisplayBuf), "Path: %s", pathScrollBuf);
             printf("%s\n", pathDisplayBuf);
 
             // Print file/folder list starting at line 2
@@ -313,18 +313,39 @@ char* selectFirmware(void) {
                         }
                     } else {
                         // Append selected folder to current path
-                        if (strcmp(currentPath, "/") != 0)
+                        if (strcmp(currentPath, "/") != 0) {
+                            if (strlen(currentPath) + 1 + strlen(entries[selection].name) + 1 > sizeof(currentPath)) {
+                                printf("Error: Path too long!\n");
+                                return NULL;
+                            }
                             strcat(currentPath, "/");
+                        }
+                        if (1 + strlen(entries[selection].name) + 1 > sizeof(currentPath)) {
+                            printf("Error: Path too long!\n");
+                            return NULL;
+                        }
                         strcat(currentPath, entries[selection].name);
                     }
                     selection = displayStart = scrollOffset = scrollTimer = 0;
                     break; // Refresh directory listing
                 } else {
                     // File selected, build full path and return it
-                    if (strcmp(currentPath, "/") == 0)
-                        snprintf(fullPath, sizeof(fullPath), "/%s", entries[selection].name);
-                    else
-                        snprintf(fullPath, sizeof(fullPath), "%s/%s", currentPath, entries[selection].name);
+                    if (strcmp(currentPath, "/") == 0) {
+                        if (1 + strlen(entries[selection].name) + 1 > sizeof(currentPath)) {
+                            printf("Error: Path too long!\n");
+                            return NULL;
+                        }
+                        strcpy(fullPath, "/");
+                        strcat(fullPath, entries[selection].name);
+                    } else {
+                        if (strlen(currentPath) + 1 + strlen(entries[selection].name) + 1 > sizeof(currentPath)) {
+                            printf("Error: Path too long!\n");
+                            return NULL;
+                        }
+                        strcpy(fullPath, currentPath);
+                        strcat(fullPath, "/");
+                        strcat(fullPath, entries[selection].name);
+                    }
 
                     return fullPath;
                 }
