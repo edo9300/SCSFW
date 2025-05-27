@@ -384,11 +384,11 @@ int main(void) {
 		consoleSelect(&btConsole);
 		consoleClear();
 		firmwareFilename = selectFirmware();
+		consoleSelect(&tpConsole);
 		if(!firmwareFilename) {
     		FileSuccess = false;
 		} else {
 		src = fopen(firmwareFilename, "rb");
-		consoleSelect(&tpConsole);
 		if (src) {
 			fseek(src, 0, SEEK_END);
 			firmSize = ftell(src);
@@ -412,7 +412,9 @@ int main(void) {
 	}
 
 	if (!FileSuccess) {
+		printf("\n\n\n\n\n\n\n\n          [File error!]\n   [USING SCFW's firmware.frm]");
 		consoleSelect(&btConsole);
+		consoleClear();
 		tonccpy(scfw_buffer, scfw_bin, (scfw_binEnd - scfw_bin));
 		firmSize = (scfw_binEnd - scfw_bin);
 	}
