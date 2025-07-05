@@ -6,18 +6,18 @@ cart_base:
 	b entrypoint
 .org 0x04
 
-# sc rumble specific code
-# when assembled for the rumble,
-# this file is padded by 0x40000
+@ sc rumble specific code
+@ when assembled for the rumble,
+@ this file is padded by 0x40000
 
-# all the data from here until 0xa0 will be replaced by
-# the nintendo logo needed for the gba header for the
-# non rumble variant of the firmware
+@ all the data from here until 0xa0 will be replaced by
+@ the nintendo logo needed for the gba header for the
+@ non rumble variant of the firmware
 
-# the "read flash" mode for the sc rumble
-# is mode "0", this would work on the sc lite
-# but doesn't work on the scsd, where it requires
-# mode "4", that in turn doesn't work on the sc rumble
+@ the "read flash" mode for the sc rumble
+@ is mode "0", this would work on the sc lite
+@ but doesn't work on the scsd, where it requires
+@ mode "4", that in turn doesn't work on the sc rumble
 sc_mode_flash_ro_rumble:
 	mov r0, # 0x0a000000
 	sub r0, r0, #0x02
@@ -35,15 +35,15 @@ real_address:
 sc_rumble_overwrite_target:
 	b sc_mode_flash_ro_rumble
 
-# magic value checked by the SuperCard rumble's firmware
-# if the value at 0x4006c is 0x00005A5A
-# it will read the value at 0x40070 as a destination address
-# to which copy the contents of the flash starting off
-# 0x40000.
-# We want to make the function
-# copying the data overwrite itself with our actual entrypoint
-# above so that it gets executed and it will
-# jump back to flash
+@ magic value checked by the SuperCard rumble's firmware
+@ if the value at 0x4006c is 0x00005A5A
+@ it will read the value at 0x40070 as a destination address
+@ to which copy the contents of the flash starting off
+@ 0x40000.
+@ We want to make the function
+@ copying the data overwrite itself with our actual entrypoint
+@ above so that it gets executed and it will
+@ jump back to flash
 .org 0x6c
 	.word 0x00005A5A
 .org 0x70
@@ -81,7 +81,7 @@ entrypoint:
 
 .set supercard_switch_mode_offset, 0x9000
 real_entrypoint:
-	# copy and run this fn from RAM
+	@ copy and run this fn from RAM
 	mov r0, #0x02000000
 	add r0, r0, $supercard_switch_mode_offset
 	adr r1, sc_mode_flash_rw
@@ -91,7 +91,7 @@ sc_mode_flash_rw_loop:
 	str r3, [r0], # 4
 	cmp r1, r2
 	blt sc_mode_flash_rw_loop
-# jumps to sc_mode_flash_rw copied to address 0x02009000
+@ jumps to sc_mode_flash_rw copied to address 0x02009000
 	mov r0, #0x02000000
 	add r0, r0, $supercard_switch_mode_offset
 	mov lr, pc
@@ -99,7 +99,7 @@ sc_mode_flash_rw_loop:
 
 rumble_entrypoint:
 	
-	# detect GBA/NDS using mirroring
+	@ detect GBA/NDS using mirroring
 	mov r0, # 0x02000000
 	add r0, r0, $supercard_switch_mode_offset
 	mov r2, # 0
@@ -112,7 +112,7 @@ rumble_entrypoint:
 	beq nds_code
 
 
-# load & execute multiboot gba rom
+@ load & execute multiboot gba rom
 load_gba:
 	adrl r0, gba_rom
 	adrl r1, gba_rom_end
@@ -125,14 +125,14 @@ load_gba_loop:
 	blt load_gba_loop
 	bx lr
 
-# load & execute nds rom
+@ load & execute nds rom
 nds_code:
-	# sets the power flag to the one preferred by the firmware and
-	# clears the flag that sets the maximum brightness when plugged in
+	@ sets the power flag to the one preferred by the firmware and
+	@ clears the flag that sets the maximum brightness when plugged in
 	bl read_backlight_from_firmware
 
-#the ds firmware stores the decrypted secure area of games at either 0x02000000 or 0x02004000
-#don't touch that memory region
+@the ds firmware stores the decrypted secure area of games at either 0x02000000 or 0x02004000
+@don't touch that memory region
 	mov r2, # 0x02000000
 	add r2, r2, $supercard_switch_mode_offset
 	mov r4, r2
@@ -153,7 +153,7 @@ load_miniboot_arm7_loop:
 	cmp r0, r1
 	blt load_miniboot_arm7_loop
 	
-	# reset arm9
+	@ reset arm9
 	mov r1, # 0x02800000
 	sub r1, r1, # 0x200
 	str r4, [r1, # 0x24]
