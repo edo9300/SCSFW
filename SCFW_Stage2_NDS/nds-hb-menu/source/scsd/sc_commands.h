@@ -24,6 +24,7 @@ typedef enum SC_FLASH_COMMAND {
 typedef enum SUPERCARD_TYPE {
     SC_SD = 0x00,
     SC_LITE = 0x01,
+    SC_CF = 0x02,
     SC_RUMBLE = (0x10 | SC_LITE),
     UNK = (uint8_t)~SC_RUMBLE
 } SUPERCARD_TYPE;

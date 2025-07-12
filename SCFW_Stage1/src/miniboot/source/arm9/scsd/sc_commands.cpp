@@ -27,26 +27,8 @@ SUPERCARD_TYPE detect_supercard_type() {
 				return SUPERCARD_TYPE::SC_RUMBLE;
 			case 0xe000:
 				return SUPERCARD_TYPE::SC_SD;
-			default: {
-				auto* cfstatns = (volatile unsigned short*)0x99c0000;
-				*cfstatns = 0x50;
-				// originally this was a single nop for timing purposes very likely
-				// but the code was designed for the arm7 of the gba, let's pump it up
-				// a bit
-				__asm__ volatile (
-					"nop\n"
-					"nop\n"
-					"nop\n"
-					"nop\n"
-					"nop\n"
-					"nop\n"
-					"nop\n"
-					"nop\n"
-				);
-				if(*cfstatns == 0x50)
-					return SUPERCARD_TYPE::SC_CF;
-				return SUPERCARD_TYPE::UNK;
-			}
+			default:
+				return SUPERCARD_TYPE::SC_CF;
 		}
 	}();
 	sc_flash_rw_enable(type);

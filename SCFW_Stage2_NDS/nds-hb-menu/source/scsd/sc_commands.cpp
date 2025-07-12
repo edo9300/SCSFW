@@ -16,9 +16,9 @@ static std::pair<volatile uint16_t*, volatile uint16_t*> get_magic_addrs(SUPERCA
 	auto* const SCLITE_FLASH_MAGIC_ADDR_2 = (volatile uint16_t*)0x08000554;
 	auto* const SC_FLASH_MAGIC_ADDR_1	 = (volatile uint16_t*)0x08000b92;
 	auto* const SC_FLASH_MAGIC_ADDR_2	 = (volatile uint16_t*)0x0800046c;
-	if(scType == SUPERCARD_TYPE::SC_SD)
-		return { SC_FLASH_MAGIC_ADDR_1, SC_FLASH_MAGIC_ADDR_2 };
-	return { SCLITE_FLASH_MAGIC_ADDR_1, SCLITE_FLASH_MAGIC_ADDR_2 };
+	if(scType & SUPERCARD_TYPE::SC_LITE)
+		return { SCLITE_FLASH_MAGIC_ADDR_1, SCLITE_FLASH_MAGIC_ADDR_2 };
+	return { SC_FLASH_MAGIC_ADDR_1, SC_FLASH_MAGIC_ADDR_2 };
 }
 
 void sc_change_mode(uint16_t mode) {
@@ -31,7 +31,7 @@ void sc_change_mode(uint16_t mode) {
 }
 
 void sc_flash_rw_enable(SUPERCARD_TYPE supercardType) {
-	sc_change_mode((supercardType == SUPERCARD_TYPE::SC_SD) ? SC_MODE_FLASH_RW : SC_MODE_FLASH_RW_LITE_RUMBLE);
+	sc_change_mode((supercardType & SUPERCARD_TYPE::SC_LITE) ? SC_MODE_FLASH_RW_LITE_RUMBLE : SC_MODE_FLASH_RW);
 }
 
 void send_command(SC_FLASH_COMMAND command, SUPERCARD_TYPE supercardType) {
@@ -91,7 +91,7 @@ SUPERCARD_TYPE get_supercard_type() {
 				case 0xe000:
 					return SUPERCARD_TYPE::SC_SD;
 				default:
-					return SUPERCARD_TYPE::UNK;
+					return SUPERCARD_TYPE::SC_CF;
 			}
 		}();
 		sc_flash_rw_enable(type);
