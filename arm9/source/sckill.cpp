@@ -20,6 +20,7 @@ enum class SC_FLASH_COMMAND : u16 {
 enum SUPERCARD_TYPE : u8 {
     SC_SD = 0x00,
     SC_LITE = 0x01,
+    SC_CF = 0x02,
     SC_RUMBLE = (0x10 | SC_LITE),
     UNK = uint8_t(~SC_RUMBLE)
 };
@@ -76,7 +77,7 @@ SUPERCARD_TYPE detect_supercard_type() {
         case 0xe000:
             return SUPERCARD_TYPE::SC_SD;
         default:
-            return SUPERCARD_TYPE::UNK;
+            return SUPERCARD_TYPE::SC_CF;
     }
 }
 
@@ -85,9 +86,9 @@ static std::pair<vu16*, vu16*> get_magic_addrs(SUPERCARD_TYPE scType = SuperCard
 	auto* const SCLITE_FLASH_MAGIC_ADDR_2 = (vu16*)0x08000554;
 	auto* const SC_FLASH_MAGIC_ADDR_1	 = (vu16*)0x08000b92;
 	auto* const SC_FLASH_MAGIC_ADDR_2	 = (vu16*)0x0800046c;
-	if(scType == SUPERCARD_TYPE::SC_SD)
-		return { SC_FLASH_MAGIC_ADDR_1, SC_FLASH_MAGIC_ADDR_2 };
-	return { SCLITE_FLASH_MAGIC_ADDR_1, SCLITE_FLASH_MAGIC_ADDR_2 };
+	if(scType & SUPERCARD_TYPE::SC_LITE)
+		return { SCLITE_FLASH_MAGIC_ADDR_1, SCLITE_FLASH_MAGIC_ADDR_2 };
+	return { SC_FLASH_MAGIC_ADDR_1, SC_FLASH_MAGIC_ADDR_2 };
 }
 
 static u32 get_max_firm_size(SUPERCARD_TYPE scType = SuperCardType) {
@@ -115,7 +116,7 @@ static void send_command(SC_FLASH_COMMAND command, SUPERCARD_TYPE scType = Super
 
 
 void sc_flash_rw_enable(SUPERCARD_TYPE scType = SuperCardType) {
-	change_mode((scType == SUPERCARD_TYPE::SC_SD) ? SC_MODE_FLASH_RW : SC_MODE_FLASH_RW_LITE_RUMBLE);
+	change_mode((scType & SUPERCARD_TYPE::SC_LITE) ? SC_MODE_FLASH_RW_LITE_RUMBLE : SC_MODE_FLASH_RW);
 }
 
 u32 get_flash_id(SUPERCARD_TYPE scType = SuperCardType) {
@@ -257,7 +258,8 @@ void printHeader() {
 	consoleSelect(&tpConsole);
 	switch(SuperCardType) {
 		case SUPERCARD_TYPE::SC_SD:
-			textBuffer = "\n\n\n\n\n\n\n\n\n\n\n        Flash ID ";
+		case SUPERCARD_TYPE::SC_CF:
+			textBuffer = "\n\n       [SCSD/SCCF MODE]\n\n\n\n\n\n\n\n\n        Flash ID ";
 			break;
 		case SUPERCARD_TYPE::SC_LITE:
 			textBuffer = "\n\n         [SCLITE MODE]\n\n\n\n\n\n\n\n\n        Flash ID ";
@@ -288,6 +290,8 @@ bool Prompt() {
 					case SUPERCARD_TYPE::SC_LITE:
 						return SUPERCARD_TYPE::SC_RUMBLE;
 					case SUPERCARD_TYPE::SC_RUMBLE:
+						return SUPERCARD_TYPE::SC_CF;
+					case SUPERCARD_TYPE::SC_CF:
 						return SUPERCARD_TYPE::SC_SD;
 					case SUPERCARD_TYPE::UNK:
 						return SUPERCARD_TYPE::SC_SD;
@@ -351,6 +355,7 @@ int main(void) {
 	SuperCardType = detect_supercard_type();
 	cachedFlashID = get_flash_id();
 	if(cachedFlashID == 0 || SuperCardType == SUPERCARD_TYPE::UNK) {
+		SuperCardType = SUPERCARD_TYPE::UNK;
 		textBuffer = "\n\n\n\n\n\n\n\n\n\nThe cart has not been recognized\n\n"
 					 "If you're sure you got a\n"
 					 "supercard\n"
